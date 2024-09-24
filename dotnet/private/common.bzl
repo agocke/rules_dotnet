@@ -22,7 +22,7 @@ def _collect_transitive():
         t[framework] = sets.union(sets.make([framework]), *[t[c] for c in compat])
     return t
 
-DEFAULT_TFM = "net8.0"
+DEFAULT_TFM = "net9.0"
 DEFAULT_RID = "base"
 
 # A dict of target frameworks to the set of other framworks it can compile
@@ -73,6 +73,7 @@ FRAMEWORK_COMPATIBILITY = {
     "net6.0": ["net5.0"],
     "net7.0": ["net6.0"],
     "net8.0": ["net7.0"],
+    "net9.0": ["net8.0"],
 }
 
 _subsystem_version = {
@@ -113,6 +114,7 @@ _subsystem_version = {
     "net6.0": None,
     "net7.0": None,
     "net8.0": None,
+    "net9.0": None,
 }
 
 _default_lang_version_csharp = {
@@ -153,6 +155,7 @@ _default_lang_version_csharp = {
     "net6.0": "10.0",
     "net7.0": "11.0",
     "net8.0": "12.0",
+    "net9.0": "13.0",
 }
 
 _net = FRAMEWORK_COMPATIBILITY.keys().index("net11")
@@ -210,7 +213,7 @@ def _format_ref_with_overrides(assembly):
     return "-r:" + assembly.path
 
 def format_ref_arg(args, refs):
-    """Takes 
+    """Takes
 
     Args:
         args: The args object that will be sent into the compilation action

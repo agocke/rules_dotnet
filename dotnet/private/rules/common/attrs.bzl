@@ -103,6 +103,10 @@ COMMON_ATTRS = {
         mandatory = False,
         default = [],
     ),
+    "disable_implicit_framework_refs": attr.bool(
+        doc = "Disable implicit framework references. This is useful when you want to control the framework references yourself.",
+        default = False,
+    ),
     "_target_framework": attr.label(
         default = "//dotnet:target_framework",
     ),
@@ -132,9 +136,9 @@ COMMON_ATTRS = {
 LIBRARY_COMMON_ATTRS = {
     "exports": attr.label_list(
         doc = """
-        List of targets to add to the dependencies of those that depend on this target. 
+        List of targets to add to the dependencies of those that depend on this target.
         Use this sparingly as it weakens the precision of the build graph.
-        
+
         This attribute does nothing if you don't have strict dependencies enabled.""",
         default = [],
         providers = [DotnetAssemblyCompileInfo, DotnetAssemblyRuntimeInfo],

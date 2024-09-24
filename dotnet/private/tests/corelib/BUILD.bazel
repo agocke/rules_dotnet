@@ -1,0 +1,11 @@
+load(
+    "//dotnet:defs.bzl",
+    "csharp_library",
+)
+
+csharp_library(
+    name = "mincorlib",
+    srcs = ["mincorlib.cs"],
+    target_frameworks = ["net6.0"],
+    disable_implicit_framework_refs = True,
+)
