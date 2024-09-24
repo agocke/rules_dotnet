@@ -18,6 +18,29 @@ load(
     "DotnetAssemblyRuntimeInfo",
 )
 
+def _write_assembly_info(actions, label_name, dll_name):
+    """Write a .cs file containing assembly attributes.
+
+    Args:
+      actions: An actions module, usually from ctx.actions.
+      label_name: The label name.
+      dll_name: The assembly name.
+
+    Returns:
+      A File object for a generated .cs file
+    """
+
+    attrs = actions.args()
+    attrs.set_param_file_format(format = "multiline")
+
+    attrs.add("[assembly: System.CLSCompliant(true)]")
+
+    output = actions.declare_file("%s/%s.AssemblyInfo.cs" % (label_name, dll_name))
+
+    actions.write(output, attrs)
+
+    return output
+
 def _write_internals_visible_to_csharp(actions, label_name, dll_name, others):
     """Write a .cs file containing InternalsVisibleTo attributes.
 
@@ -163,6 +186,13 @@ def AssemblyAction(
     # Appsettings
     out_appsettings = copy_files_to_dir(target_name, actions, is_windows, appsetting_files, out_dir)
 
+    assembly_info_cs = _write_assembly_info(
+        actions,
+        label_name = target_name,
+        dll_name = assembly_name
+    )
+    all_srcs = srcs + [assembly_info_cs]
+
     if len(internals_visible_to) == 0:
         _compile(
             actions,
@@ -177,7 +207,7 @@ def AssemblyAction(
             irefs,
             framework_files,
             resources,
-            srcs,
+            all_srcs,
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
             target,
@@ -224,7 +254,7 @@ def AssemblyAction(
             irefs,
             framework_files,
             resources,
-            srcs + [internals_visible_to_cs],
+            all_srcs + [internals_visible_to_cs],
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
             target,
@@ -260,7 +290,7 @@ def AssemblyAction(
             irefs,
             framework_files,
             resources,
-            srcs,
+            all_srcs,
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
             target,
