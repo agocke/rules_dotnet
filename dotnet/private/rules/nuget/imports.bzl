@@ -25,6 +25,7 @@ def _import_library(ctx):
     ) = collect_compile_info(
         ctx.label.name,
         ctx.attr.deps,
+        [],
         None,
         [],
         get_toolchain(ctx).strict_deps[BuildSettingInfo].value,

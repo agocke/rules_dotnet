@@ -205,7 +205,7 @@ def _find_ref_by_file_name(refs, file_name):
 
     return None
 
-def collect_compile_info(name, deps, targeting_pack, exports, strict_deps):
+def collect_compile_info(name, deps, analyzers, targeting_pack, exports, strict_deps):
     """Determine the transitive dependencies by the target framework.
 
     Args:
@@ -257,6 +257,10 @@ def collect_compile_info(name, deps, targeting_pack, exports, strict_deps):
             direct_analyzers_fsharp.extend(compile_info.analyzers_fsharp)
             direct_analyzers_vb.extend(compile_info.analyzers_vb)
             direct_compile_data.extend(compile_info.compile_data)
+
+    for a in analyzers:
+        assembly = a[DotnetAssemblyRuntimeInfo]
+        direct_analyzers.extend(assembly.libs)
 
     for dep in deps:
         assembly = dep[DotnetAssemblyCompileInfo]

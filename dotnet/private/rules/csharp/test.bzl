@@ -30,6 +30,7 @@ def _compile_action(ctx, tfm):
         exports = [],
         targeting_pack = ctx.attr._targeting_pack[0],
         internals_visible_to = ctx.attr.internals_visible_to,
+        cls_compliant = ctx.attr.cls_compliant,
         keyfile = ctx.file.keyfile,
         langversion = ctx.attr.langversion if ctx.attr.langversion != "" else toolchain.dotnetinfo.csharp_default_version,
         resources = ctx.files.resources,
