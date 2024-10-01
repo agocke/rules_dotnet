@@ -233,7 +233,7 @@ def _find_ref_by_file_name(refs, file_name):
 
     return None
 
-def collect_compile_info(name, deps, targeting_pack, exports, strict_deps):
+def collect_compile_info(name, deps, analyzers, targeting_pack, exports, strict_deps):
     """Determine the transitive dependencies by the target framework.
 
     Args:
@@ -276,6 +276,10 @@ def collect_compile_info(name, deps, targeting_pack, exports, strict_deps):
 
             direct_analyzers.extend(compile_info.analyzers)
             direct_compile_data.extend(compile_info.compile_data)
+
+    for a in analyzers:
+        assembly = a[DotnetAssemblyRuntimeInfo]
+        direct_analyzers.extend(assembly.libs)
 
     for dep in deps:
         assembly = dep[DotnetAssemblyCompileInfo]
@@ -493,10 +497,10 @@ def framework_preprocessor_symbols(tfm):
 
     if tfm.startswith("netstandard"):
         return ["NETSTANDARD", specific]
-    elif tfm.startswith("netcoreapp"):
-        return ["NETCOREAPP", specific]
-    else:
+    elif tfm.startswith("net4"):
         return ["NETFRAMEWORK", specific]
+    else:
+        return ["NETCOREAPP", specific]
 
 # For deps.json spec see: https://github.com/dotnet/sdk/blob/main/documentation/specs/runtime-configuration-file.md
 def generate_depsjson(

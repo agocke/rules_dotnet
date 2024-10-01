@@ -18,7 +18,7 @@ load(
     "DotnetAssemblyRuntimeInfo",
 )
 
-def _write_assembly_info(actions, label_name, dll_name):
+def _write_assembly_info(actions, label_name, dll_name, cls_compliant):
     """Write a .cs file containing assembly attributes.
 
     Args:
@@ -33,7 +33,8 @@ def _write_assembly_info(actions, label_name, dll_name):
     attrs = actions.args()
     attrs.set_param_file_format(format = "multiline")
 
-    attrs.add("[assembly: System.CLSCompliant(true)]")
+    if cls_compliant:
+        attrs.add("[assembly: System.CLSCompliant(true)]")
 
     output = actions.declare_file("%s/%s.AssemblyInfo.cs" % (label_name, dll_name))
 
@@ -79,12 +80,14 @@ def AssemblyAction(
         actions,
         compiler_wrapper,
         additionalfiles,
+        direct_analyzers,
         debug,
         defines,
         deps,
         exports,
         targeting_pack,
         internals_visible_to,
+        cls_compliant,
         keyfile,
         langversion,
         resources,
@@ -119,12 +122,14 @@ def AssemblyAction(
         actions: Bazel module providing functions to create actions.
         compiler_wrapper: The wrapper script that invokes the C# compiler.
         additionalfiles: Names additional files that don't directly affect code generation but may be used by analyzers for producing errors or warnings.
+        direct_analyzers: Directly referenced analyzers.
         debug: Emits debugging information.
         defines: The list of conditional compilation symbols.
         deps: The list of other libraries to be linked in to the assembly.
         exports: List of exported targets.
         targeting_pack: The targeting pack being used.
         internals_visible_to: An optional list of assemblies that can see this assemblies internal symbols.
+        cls_compliant: False to disable CLS compliance.
         keyfile: Specifies a strong name key file of the assembly.
         langversion: Specify language version: Default, ISO-1, ISO-2, 3, 4, 5, 6, 7, 7.1, 7.2, 7.3, or Latest
         resources: The list of resouces to be embedded in the assembly.
@@ -167,6 +172,7 @@ def AssemblyAction(
     ) = collect_compile_info(
         assembly_name,
         deps + [toolchain.host_model] if include_host_model_dll else deps,
+        direct_analyzers,
         targeting_pack,
         exports,
         strict_deps,
@@ -189,8 +195,9 @@ def AssemblyAction(
     assembly_info_cs = _write_assembly_info(
         actions,
         label_name = target_name,
-        dll_name = assembly_name
-    )
+        dll_name = assembly_name,
+        cls_compliant = cls_compliant)
+
     all_srcs = srcs + [assembly_info_cs]
 
     if len(internals_visible_to) == 0:
