@@ -18,7 +18,7 @@ load(
     "DotnetAssemblyRuntimeInfo",
 )
 
-def _write_assembly_info(actions, label_name, dll_name, cls_compliant):
+def _write_assembly_info(actions, label_name, dll_name, cls_compliant, assembly_version):
     """Write a .cs file containing assembly attributes.
 
     Args:
@@ -35,6 +35,9 @@ def _write_assembly_info(actions, label_name, dll_name, cls_compliant):
 
     if cls_compliant:
         attrs.add("[assembly: System.CLSCompliant(true)]")
+
+    if assembly_version != "":
+        attrs.add("[assembly: System.Reflection.AssemblyVersion(\"%s\")]" % assembly_version)
 
     output = actions.declare_file("%s/%s.AssemblyInfo.cs" % (label_name, dll_name))
 
@@ -88,6 +91,7 @@ def AssemblyAction(
         targeting_pack,
         internals_visible_to,
         cls_compliant,
+        assembly_version,
         keyfile,
         langversion,
         resources,
@@ -130,6 +134,7 @@ def AssemblyAction(
         targeting_pack: The targeting pack being used.
         internals_visible_to: An optional list of assemblies that can see this assemblies internal symbols.
         cls_compliant: False to disable CLS compliance.
+        assembly_version: The version of the assembly.
         keyfile: Specifies a strong name key file of the assembly.
         langversion: Specify language version: Default, ISO-1, ISO-2, 3, 4, 5, 6, 7, 7.1, 7.2, 7.3, or Latest
         resources: The list of resouces to be embedded in the assembly.
@@ -196,7 +201,8 @@ def AssemblyAction(
         actions,
         label_name = target_name,
         dll_name = assembly_name,
-        cls_compliant = cls_compliant)
+        cls_compliant = cls_compliant,
+        assembly_version = assembly_version)
 
     all_srcs = srcs + [assembly_info_cs]
 

@@ -26,6 +26,7 @@ def _compile_action(ctx, tfm):
         targeting_pack = ctx.attr._targeting_pack[0],
         internals_visible_to = ctx.attr.internals_visible_to,
         cls_compliant = ctx.attr.cls_compliant,
+        assembly_version = ctx.attr.assembly_version,
         keyfile = ctx.file.keyfile,
         langversion = ctx.attr.langversion,
         resources = ctx.files.resources,
