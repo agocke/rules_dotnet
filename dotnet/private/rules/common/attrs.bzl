@@ -77,6 +77,9 @@ COMMON_ATTRS = {
         doc = "Whether the assembly is CLS compliant.",
         default = True,
     ),
+    "assembly_version": attr.string(
+        doc = "The assembly version.",
+    ),
     "treat_warnings_as_errors": attr.bool(
         doc = "Treat all compiler warnings as errors. Note that this attribute can not be used in conjunction with warnings_as_errors.",
         mandatory = False,
