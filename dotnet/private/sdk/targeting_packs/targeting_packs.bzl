@@ -44,3 +44,4 @@ def targeting_packs():
     targeting_pack(name = "web_net7.0", packs = ["@dotnet.targeting_packs//microsoft.aspnetcore.app.ref.v7.0.20", "@dotnet.targeting_packs//microsoft.netcore.app.ref.v7.0.20"], target_framework = "net7.0")
     targeting_pack(name = "web_net8.0", packs = ["@dotnet.targeting_packs//microsoft.aspnetcore.app.ref.v8.0.8", "@dotnet.targeting_packs//microsoft.netcore.app.ref.v8.0.8"], target_framework = "net8.0")
     targeting_pack(name = "web_net9.0", packs = ["@dotnet.targeting_packs//microsoft.aspnetcore.app.ref.v9.0.0-rc.1.24452.1", "@dotnet.targeting_packs//microsoft.netcore.app.ref.v9.0.0-rc.1.24431.7"], target_framework = "net9.0")
+
