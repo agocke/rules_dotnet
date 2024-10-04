@@ -154,6 +154,7 @@ def AssemblyAction(
     ) = collect_compile_info(
         assembly_name,
         deps,
+        [],
         targeting_pack,
         exports,
         strict_deps,
