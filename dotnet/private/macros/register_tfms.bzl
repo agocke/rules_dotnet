@@ -13,6 +13,10 @@ load(
     "//dotnet/private/sdk:rids.bzl",
     "RUNTIME_GRAPH",
 )
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+
+def get_tfm_value(tfm):
+    return tfm[BuildSettingInfo].value
 
 # buildifier: disable=unnamed-macro
 def register_tfms():

@@ -6,6 +6,7 @@ Users should not load files under "/dotnet"
 load(
     "//dotnet/private/rules/csharp:binary.bzl",
     _csharp_binary = "csharp_binary",
+    _compile_csharp_exe = "compile_csharp_exe",
 )
 load(
     "//dotnet/private/rules/csharp:library.bzl",
@@ -54,6 +55,7 @@ load(
 )
 
 csharp_binary = _csharp_binary
+compile_csharp_exe = _compile_csharp_exe
 csharp_library = _csharp_library
 csharp_test = _csharp_test
 csharp_nunit_test = _csharp_nunit_test

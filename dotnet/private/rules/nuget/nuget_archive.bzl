@@ -243,6 +243,11 @@ def _process_runtimes_file(groups, file):
 
     return
 
+def _process_tools_file(groups, file):
+    group = groups["tools"]
+    group.append(file)
+    return
+
 def _process_key_and_file(groups, key, file):
     # todo resource dlls
     if key == "lib":
@@ -259,6 +264,8 @@ def _process_key_and_file(groups, key, file):
         _process_runtimes_file(groups, file)
     elif key == "build":
         _process_build_file(groups, file)
+    elif key == "tools":
+        _process_tools_file(groups, file)
 
     return
 
@@ -364,6 +371,7 @@ def _nuget_archive_impl(ctx):
         #     currently we just blindly add the files to the lib or ref group depending on the folder name
         "build": {
         },
+        "tools": [],
     }
 
     for file in files:
@@ -456,6 +464,7 @@ load("@rules_dotnet//dotnet/private/rules/nuget:nuget_archive.bzl", "tfm_filegro
         "filegroup(name = \"data\", srcs = [])",
         _create_rid_native_select("native", native) or "filegroup(name = \"native\", srcs = [])",
         "filegroup(name = \"content_files\", srcs = [%s])" % ",".join(["\n  \"%s\"" % a for a in groups.get("contentFiles")["any"]]),
+        "filegroup(name = \"tools\", srcs = [%s])" % ",".join(["\n  \"%s\"" % a for a in groups.get("tools")]),
         "exports_files([\"%s\"])" % nupkg_name,
     ]))
 

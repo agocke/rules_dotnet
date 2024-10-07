@@ -60,6 +60,17 @@ def _binary_private_impl(ctx):
     result = build_binary(ctx, _compile_action)
     return result
 
+def compile_csharp_exe(ctx, tfm):
+    """Compiles a C# exe.
+
+    Args:
+        ctx: Bazel build ctx.
+        tfm: Target framework string
+    Returns:
+        A collection of the references, runfiles and native dlls.
+    """
+    return _compile_action(ctx, tfm)
+
 csharp_binary = rule(
     _binary_private_impl,
     doc = """Compile a C# exe""",

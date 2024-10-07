@@ -385,6 +385,7 @@ def _compile(
         out_ref = None,
         out_pdb = None,
         out_xml = None):
+
     # Our goal is to match msbuild as much as reasonable
     # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically
     args = actions.args()
