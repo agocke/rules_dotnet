@@ -75,6 +75,7 @@ def _nuget_repo_impl(ctx):
 alias(name = "{name}", actual = "//{id}/{version}")
 alias(name = "content_files", actual = "@{prefix}.{id}.v{version}//:content_files")
 alias(name = "files", actual = "@{prefix}.{id}.v{version}//:files")
+alias(name = "tools", actual = "@{prefix}.{id}.v{version}//:tools")
 """.format(prefix = _GLOBAL_NUGET_PREFIX, name = name.lower(), id = id.lower(), version = version))
 
         tool_aliases = []
