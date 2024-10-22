@@ -615,7 +615,9 @@ def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, rol
             frameworks.append({"name": assembly_runtime_info.name, "version": assembly_runtime_info.version})
         base["runtimeOptions"]["includedFrameworks"] = frameworks
     else:
-        runtime_version = "9.0.0-preview.7.24405.7" # tfm_to_semver(target_framework)
+        runtime_version = tfm_to_semver(target_framework)
+        if runtime_version == "net9.0":
+            runtime_version = "9.0.0-preview.7.24405.7"
         frameworks = [
             {"name": "Microsoft.NETCore.App", "version": runtime_version},
         ]

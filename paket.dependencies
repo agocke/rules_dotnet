@@ -3,14 +3,14 @@ group paket2bazel_dependencies
     framework: net8.0
     source https://api.nuget.org/v3/index.json
 
-    nuget FSharp.Core == 8.0.200 
+    nuget FSharp.Core == 8.0.200
     nuget Argu 6.2.3
-    nuget Paket.Core 8.0.3
-    nuget NuGet.PackageManagement 6.9.1
-    nuget NuGet.Packaging 6.9.1
-    nuget NuGet.Protocol 6.9.1
-    nuget NuGet.Credentials 6.9.1
-    nuget NuGet.Resolver 6.9.1
+    nuget Paket.Core 8.1.0-alpha004
+    nuget NuGet.PackageManagement 6.11.1
+    nuget NuGet.Packaging 6.11.1
+    nuget NuGet.Protocol 6.11.1
+    nuget NuGet.Credentials 6.11.1
+    nuget NuGet.Resolver 6.11.1
     nuget System.Text.Json 5.0.2
 
 group rules_dotnet_dev_nuget_packages
