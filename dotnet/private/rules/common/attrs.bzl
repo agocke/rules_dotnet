@@ -150,6 +150,10 @@ LIBRARY_COMMON_ATTRS = {
         default = [],
         providers = [DotnetAssemblyCompileInfo],
     ),
+    "ref_assembly": attr.bool(
+        doc = "True if this is a reference assembly.",
+        default = False,
+    ),
 }
 
 # These are attributes that are common across all binary/test rules

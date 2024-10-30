@@ -117,6 +117,7 @@ def AssemblyAction(
         nullable,
         run_analyzers,
         compiler_options,
+        ref_assembly,
         is_windows):
     """Creates an action that runs the CSharp compiler with the specified inputs.
 
@@ -160,6 +161,7 @@ def AssemblyAction(
         nullable: Enable nullable context, or nullable warnings.
         run_analyzers: Enable analyzers.
         compiler_options: Additional options to pass to the compiler.
+        ref_assembly: True if the output assembly is a reference assembly.
         is_windows: Whether or not the target is running on Windows.
     Returns:
         The compiled csharp artifacts.
@@ -341,7 +343,7 @@ def AssemblyAction(
     ), DotnetAssemblyRuntimeInfo(
         name = assembly_name,
         version = "1.0.0",  #TODO: Maybe make this configurable?
-        libs = [out_dll],
+        libs = [out_dll] if not ref_assembly else [],
         pdbs = [out_pdb] if out_pdb else [],
         xml_docs = [out_xml] if out_xml else [],
         data = data,

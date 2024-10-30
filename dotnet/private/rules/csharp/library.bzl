@@ -52,6 +52,7 @@ def _compile_action(ctx, tfm):
         nullable = ctx.attr.nullable,
         run_analyzers = ctx.attr.run_analyzers,
         compiler_options = ctx.attr.compiler_options,
+        ref_assembly = ctx.attr.ref_assembly,
         is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]),
     )
 
