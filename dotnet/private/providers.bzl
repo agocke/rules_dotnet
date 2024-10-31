@@ -14,6 +14,7 @@ DotnetAssemblyCompileInfo = provider(
         "transitive_refs": "depset[File]: Transitive reference-only assemblies containing only public symbols. Only used when strict deps are off.",
         "transitive_compile_data": "depset[File]: Transitive compile data files. Only used when strict deps are off.",
         "transitive_analyzers": "depset[File]: Transitive analyzer dlls. Only used when strict deps are off.",
+        "alias": "string: The extern alias of the assembly",
     },
 )
 
