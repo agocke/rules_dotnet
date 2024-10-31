@@ -20,6 +20,7 @@ DotnetAssemblyCompileInfo = provider(
         "transitive_analyzers_csharp": "depset[File]: Transitive C# analyzer dlls. Only used when strict deps are off.",
         "transitive_analyzers_fsharp": "depset[File]: Transitive F# analyzer dlls. Only used when strict deps are off.",
         "transitive_analyzers_vb": "depset[File]: Transitive VB analyzer dlls. Only used when strict deps are off.",
+        "alias": "string: The extern alias of the assembly",
     },
 )
 
