@@ -300,6 +300,7 @@ def AssemblyAction(
         transitive_analyzers_fsharp = analyzers_fsharp,
         transitive_analyzers_vb = analyzers_vb,
         transitive_compile_data = transitive_compile_data,
+        alias = None,
     ), DotnetAssemblyRuntimeInfo(
         name = assembly_name,
         version = "1.0.0",  #TODO: Maybe make this configurable?

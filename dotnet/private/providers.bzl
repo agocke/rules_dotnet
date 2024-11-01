@@ -7,6 +7,7 @@ DotnetAssemblyCompileInfo = provider(
         "project_sdk": "string: The SDK being targeted",
         "refs": "list[File]: Reference-only assemblies containing only public symbols. See docs/ReferenceAssemblies.md for more info.",
         "irefs": "list[File]: Reference-only assemblies containing public and internal symbols. See docs/ReferenceAssemblies.md for more info.",
+        "alias": "string: The extern alias of the assembly",
         "analyzers": "list[File]: Common language analyzer dlls",
         "analyzers_csharp": "list[File]: C# analyzer dlls",
         "analyzers_fsharp": "list[File]: F# analyzer dlls",
@@ -20,7 +21,6 @@ DotnetAssemblyCompileInfo = provider(
         "transitive_analyzers_csharp": "depset[File]: Transitive C# analyzer dlls. Only used when strict deps are off.",
         "transitive_analyzers_fsharp": "depset[File]: Transitive F# analyzer dlls. Only used when strict deps are off.",
         "transitive_analyzers_vb": "depset[File]: Transitive VB analyzer dlls. Only used when strict deps are off.",
-        "alias": "string: The extern alias of the assembly",
     },
 )
 

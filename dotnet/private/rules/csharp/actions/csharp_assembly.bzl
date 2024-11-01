@@ -388,6 +388,7 @@ def AssemblyAction(
         transitive_analyzers_fsharp = analyzers_fsharp,
         transitive_analyzers_vb = analyzers_vb,
         transitive_compile_data = transitive_compile_data,
+        alias = None,
     ), DotnetAssemblyRuntimeInfo(
         name = assembly_name,
         version = "1.0.0",  #TODO: Maybe make this configurable?
@@ -553,12 +554,14 @@ def _compile(
 
     # dotnet.exe csc.dll /noconfig <other csc args>
     # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/command-line-building-with-csc-exe
+    print(refs)
+    print(type(framework_files))
     actions.run(
         mnemonic = "CSharpCompile",
         progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
         inputs = depset(
-            direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
-            transitive = [refs, analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
+            direct = direct_inputs + aliased_to_files(framework_files) + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
+            transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
         ),
         outputs = outputs,
         executable = compiler_wrapper,
@@ -571,3 +574,13 @@ def _compile(
             "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
         },
     )
+
+def aliased_to_files(alias_depset):
+    if type(alias_depset) == "depset":
+        list = alias_depset.to_list()
+    else:
+        list = alias_depset
+    files = []
+    for (file, alias) in list:
+        files.append(file)
+    return files

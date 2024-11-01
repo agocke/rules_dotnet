@@ -57,6 +57,7 @@ def _import_library(ctx):
         transitive_analyzers_fsharp = analyzers_fsharp,
         transitive_analyzers_vb = analyzers_vb,
         internals_visible_to = [],
+        alias = None,
     )
 
     dotnet_assembly_runtime_info = DotnetAssemblyRuntimeInfo(
@@ -184,6 +185,7 @@ def _import_dll(ctx):
         transitive_analyzers_fsharp = depset([]),
         transitive_analyzers_vb = depset([]),
         internals_visible_to = [],
+        alias = None,
     )
     assembly_runtime_info = DotnetAssemblyRuntimeInfo(
         name = ctx.file.dll.basename[:-4],

@@ -178,11 +178,14 @@ def get_toolchain(ctx):
     return ctx.toolchains["//dotnet:toolchain_type"]
 
 def _format_ref_with_overrides(assembly):
+    (file, alias) = assembly
     # See https://github.com/bazel-contrib/rules_dotnet/issues/405
     # The following files should not be passed as references to the compiler
-    if assembly.path.endswith("System.EnterpriseServices.Thunk.dll") or assembly.path.endswith("System.EnterpriseServices.Wrapper.dll"):
+    if file.endswith("System.EnterpriseServices.Thunk.dll") or file.endswith("System.EnterpriseServices.Wrapper.dll"):
         return None
-    return "-r:" + assembly.path
+    if alias == None:
+        return "-r:%s" % file
+    return "-r:%s=%s" % (alias, file)
 
 def format_ref_arg(args, refs):
     """Takes
@@ -280,8 +283,13 @@ def collect_compile_info(name, deps, analyzers, targeting_pack, exports, strict_
                 add_to_output = False
 
         if add_to_output:
-            direct_iref.extend(assembly.irefs if name in assembly.internals_visible_to else assembly.refs)
-            direct_ref.extend(assembly.refs)
+            irefs = assembly.irefs if name in assembly.internals_visible_to else assembly.refs
+            refs = assembly.refs
+            irefs = [(iref, assembly.alias) for iref in irefs]
+            refs = [(ref, assembly.alias) for ref in refs]
+
+            direct_iref.extend(irefs)
+            direct_ref.extend(refs)
             direct_analyzers.extend(assembly.analyzers)
             direct_analyzers_csharp.extend(assembly.analyzers_csharp)
             direct_analyzers_fsharp.extend(assembly.analyzers_fsharp)
