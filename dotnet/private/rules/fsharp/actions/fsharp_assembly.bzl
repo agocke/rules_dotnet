@@ -285,6 +285,7 @@ def AssemblyAction(
         transitive_refs = prefs,
         transitive_analyzers = analyzers,
         transitive_compile_data = transitive_compile_data,
+        alias = None,
     ), DotnetAssemblyRuntimeInfo(
         name = assembly_name,
         version = "1.0.0",  #TODO: Maybe make this configurable?

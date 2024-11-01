@@ -47,6 +47,7 @@ def _import_library(ctx):
         transitive_refs = prefs,
         transitive_analyzers = analyzers,
         internals_visible_to = [],
+        alias = None,
     )
 
     dotnet_assembly_runtime_info = DotnetAssemblyRuntimeInfo(
@@ -147,6 +148,7 @@ def _import_dll(ctx):
         transitive_refs = depset([]),
         transitive_analyzers = depset([]),
         internals_visible_to = [],
+        alias = None,
     )
     assembly_runtime_info = DotnetAssemblyRuntimeInfo(
         name = ctx.file.dll.basename[:-4],

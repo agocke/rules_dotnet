@@ -7,6 +7,7 @@ DotnetAssemblyCompileInfo = provider(
         "project_sdk": "string: The SDK being targeted",
         "refs": "list[File]: Reference-only assemblies containing only public symbols. See docs/ReferenceAssemblies.md for more info.",
         "irefs": "list[File]: Reference-only assemblies containing public and internal symbols. See docs/ReferenceAssemblies.md for more info.",
+        "alias": "string: The extern alias of the assembly",
         "analyzers": "list[File]: Analyzer dlls",
         "internals_visible_to": "list[string]: A list of assemblies that can use the assemblies listed in iref for compilation. See docs/ReferenceAssemblies.md for more info.",
         "compile_data": "list[File]: Compile data files",
@@ -14,7 +15,6 @@ DotnetAssemblyCompileInfo = provider(
         "transitive_refs": "depset[File]: Transitive reference-only assemblies containing only public symbols. Only used when strict deps are off.",
         "transitive_compile_data": "depset[File]: Transitive compile data files. Only used when strict deps are off.",
         "transitive_analyzers": "depset[File]: Transitive analyzer dlls. Only used when strict deps are off.",
-        "alias": "string: The extern alias of the assembly",
     },
 )
 

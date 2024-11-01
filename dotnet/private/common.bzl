@@ -210,7 +210,10 @@ def is_greater_or_equal_framework(tfm1, tfm2):
     return False
 
 def _format_ref_with_overrides(assembly):
-    return "-r:" + assembly.path
+    (file, alias) = assembly
+    if alias == None:
+        return "-r:%s" % file
+    return "-r:%s=%s" % (alias, file)
 
 def format_ref_arg(args, refs):
     """Takes
@@ -299,8 +302,13 @@ def collect_compile_info(name, deps, analyzers, targeting_pack, exports, strict_
                 add_to_output = False
 
         if add_to_output:
-            direct_iref.extend(assembly.irefs if name in assembly.internals_visible_to else assembly.refs)
-            direct_ref.extend(assembly.refs)
+            irefs = assembly.irefs if name in assembly.internals_visible_to else assembly.refs
+            refs = assembly.refs
+            irefs = [(iref, assembly.alias) for iref in irefs]
+            refs = [(ref, assembly.alias) for ref in refs]
+
+            direct_iref.extend(irefs)
+            direct_ref.extend(refs)
             direct_analyzers.extend(assembly.analyzers)
             direct_compile_data.extend(assembly.compile_data)
 
