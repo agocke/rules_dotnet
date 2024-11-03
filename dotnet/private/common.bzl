@@ -212,8 +212,8 @@ def is_greater_or_equal_framework(tfm1, tfm2):
 def _format_ref_with_overrides(assembly):
     (file, alias) = assembly
     if alias == None:
-        return "-r:%s" % file
-    return "-r:%s=%s" % (alias, file)
+        return "-r:%s" % file.path
+    return "-r:%s=%s" % (alias, file.path)
 
 def format_ref_arg(args, refs):
     """Takes
