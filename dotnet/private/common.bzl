@@ -184,8 +184,8 @@ def _format_ref_with_overrides(assembly):
     if file.endswith("System.EnterpriseServices.Thunk.dll") or file.endswith("System.EnterpriseServices.Wrapper.dll"):
         return None
     if alias == None:
-        return "-r:%s" % file
-    return "-r:%s=%s" % (alias, file)
+        return "-r:%s" % file.path
+    return "-r:%s=%s" % (alias, file.path)
 
 def format_ref_arg(args, refs):
     """Takes
