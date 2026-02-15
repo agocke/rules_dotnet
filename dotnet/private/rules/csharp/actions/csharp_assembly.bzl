@@ -558,7 +558,7 @@ def _compile(
         mnemonic = "CSharpCompile",
         progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
         inputs = depset(
-            direct = direct_inputs + aliased_to_files(framework_files) + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
+            direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
             transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
         ),
         outputs = outputs,

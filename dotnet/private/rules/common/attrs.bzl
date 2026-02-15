@@ -116,6 +116,10 @@ COMMON_ATTRS = {
         Typically this is left unset so that Bazel automatically selects the right toolchain.
         """,
     ),
+    "disable_implicit_framework_refs": attr.bool(
+        doc = "Disable implicit framework references. This is useful when you want to control the framework references yourself.",
+        default = False,
+    ),
     "_target_framework": attr.label(
         default = "//dotnet:target_framework",
     ),

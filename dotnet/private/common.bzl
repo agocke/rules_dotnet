@@ -181,7 +181,7 @@ def _format_ref_with_overrides(assembly):
     (file, alias) = assembly
     # See https://github.com/bazel-contrib/rules_dotnet/issues/405
     # The following files should not be passed as references to the compiler
-    if file.endswith("System.EnterpriseServices.Thunk.dll") or file.endswith("System.EnterpriseServices.Wrapper.dll"):
+    if file.path.endswith("System.EnterpriseServices.Thunk.dll") or file.path.endswith("System.EnterpriseServices.Wrapper.dll"):
         return None
     if alias == None:
         return "-r:%s" % file.path

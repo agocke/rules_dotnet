@@ -6,6 +6,9 @@ def _impl(settings, attr):
     project_sdk = attr.project_sdk
     incoming_target_framework = settings["//dotnet:target_framework"]
 
+    if attr.disable_implicit_framework_refs:
+        return {"//dotnet/private/sdk/targeting_packs:targeting_pack": "empty_pack"}
+
     supported_tfms = targeting_pack_lookup_table.get(project_sdk)
     if supported_tfms:
         targeting_pack = supported_tfms.get(incoming_target_framework)
