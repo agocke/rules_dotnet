@@ -51,6 +51,15 @@ filegroup(
     visibility = ["//visibility:public"],
 )
 
+filegroup(
+    name = "apphost",
+    srcs = glob([
+        "sdk/**/AppHostTemplate/apphost.exe", # windows
+        "sdk/**/AppHostTemplate/apphost",
+    ], allow_empty = True),
+    visibility = ["//visibility:public"],
+)
+
 import_dll(
     name = "host_model",
     version = "{runtime_version}",
