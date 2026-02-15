@@ -33,6 +33,7 @@ def _compile_action(ctx, tfm):
         keyfile = ctx.file.keyfile,
         langversion = ctx.attr.langversion if ctx.attr.langversion != "" else toolchain.dotnetinfo.csharp_default_version,
         resources = ctx.files.resources,
+        resource_logical_names = getattr(ctx.attr, "resource_logical_names", {}),
         srcs = ctx.files.srcs,
         data = ctx.files.data,
         appsetting_files = ctx.files.appsetting_files,

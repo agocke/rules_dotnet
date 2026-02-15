@@ -115,6 +115,7 @@ def AssemblyAction(
         keyfile,
         langversion,
         resources,
+        resource_logical_names,
         srcs,
         data,
         appsetting_files,
@@ -163,6 +164,7 @@ def AssemblyAction(
         keyfile: Specifies a strong name key file of the assembly.
         langversion: Specify language version: Default, ISO-1, ISO-2, 3, 4, 5, 6, 7, 7.1, 7.2, 7.3, or Latest
         resources: The list of resouces to be embedded in the assembly.
+        resource_logical_names: A dict mapping resource files to explicit manifest names (MSBuild LogicalName equivalent).
         srcs: The list of source (.cs) files that are processed to create the assembly.
         data: List of files that are a direct runtime dependency
         appsetting_files: List of appsettings files to include in the output.
@@ -244,6 +246,20 @@ def AssemblyAction(
 
     all_srcs = srcs + [assembly_info_cs]
 
+    # Build the list of resource files with explicit logical names and a
+    # lookup map from file path to logical name.  resource_logical_names is a
+    # string_dict mapping file basenames to manifest names.
+    resource_logical_name_files = []
+    resource_logical_name_map = {}
+    remaining_resources = []
+    for f in resources:
+        logical_name = resource_logical_names.get(f.basename)
+        if logical_name != None:
+            resource_logical_name_files.append(f)
+            resource_logical_name_map[f.path] = logical_name
+        else:
+            remaining_resources.append(f)
+
     if len(internals_visible_to) == 0 or is_analyzer:
         _compile(
             actions,
@@ -259,7 +275,9 @@ def AssemblyAction(
             langversion,
             irefs,
             framework_files,
-            resources,
+            remaining_resources,
+            resource_logical_name_files,
+            resource_logical_name_map,
             all_srcs,
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
@@ -308,7 +326,9 @@ def AssemblyAction(
             langversion,
             irefs,
             framework_files,
-            resources,
+            remaining_resources,
+            resource_logical_name_files,
+            resource_logical_name_map,
             all_srcs + [internals_visible_to_cs],
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
@@ -346,7 +366,9 @@ def AssemblyAction(
             langversion,
             irefs,
             framework_files,
-            resources,
+            remaining_resources,
+            resource_logical_name_files,
+            resource_logical_name_map,
             all_srcs,
             depset(compile_data, transitive = [transitive_compile_data]),
             subsystem_version,
@@ -422,6 +444,8 @@ def _compile(
         refs,
         framework_files,
         resources,
+        resource_logical_name_files,
+        resource_logical_name_map,
         srcs,
         compile_data,
         subsystem_version,
@@ -532,6 +556,10 @@ def _compile(
     # resources
     args.add_all(resources, map_each = lambda r: map_resource_arg(r, label, out_dll.basename if out_dll != None else None, language = "csharp"), allow_closure = True)
 
+    # resources with explicit logical names (MSBuild LogicalName equivalent)
+    for r in resource_logical_name_files:
+        args.add("/resource:%s,%s" % (r.path, resource_logical_name_map[r.path]))
+
     # defines
     args.add_all(defines, format_each = "/d:%s")
 
@@ -549,7 +577,7 @@ def _compile(
 
     args.use_param_file("@%s", use_always = True)
 
-    direct_inputs = srcs + resources + additionalfiles + analyzer_configs + [toolchain.csharp_compiler.files_to_run.executable]
+    direct_inputs = srcs + resources + resource_logical_name_files + additionalfiles + analyzer_configs + [toolchain.csharp_compiler.files_to_run.executable]
     direct_inputs += [keyfile] if keyfile else []
 
     # dotnet.exe csc.dll /noconfig <other csc args>
