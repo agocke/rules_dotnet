@@ -492,6 +492,13 @@ def framework_preprocessor_symbols(tfm):
         # net461 -> NET461_OR_GREATER
         framework.upper().replace(".", "_") + "_OR_GREATER"
         for framework in sets.to_list(TRANSITIVE_FRAMEWORK_COMPATIBILITY[tfm])
+        # MSBuild does not emit NETSTANDARD*_OR_GREATER for netcoreapp/net targets.
+        # The transitive graph includes netstandard via netcoreapp1.0, but the
+        # preprocessor symbols should only include frameworks from the same family.
+        if not (
+            framework.startswith("netstandard") and
+            not tfm.startswith("netstandard")
+        )
     ]
 
     if tfm.startswith("netstandard"):
@@ -501,7 +508,9 @@ def framework_preprocessor_symbols(tfm):
     elif tfm.startswith("net4"):
         defines.append("NETFRAMEWORK")
     elif tfm.startswith("net"):
+        # net5.0+ is the successor to netcoreapp; MSBuild emits both NET and NETCOREAPP.
         defines.append("NET")
+        defines.append("NETCOREAPP")
 
     return defines
 
