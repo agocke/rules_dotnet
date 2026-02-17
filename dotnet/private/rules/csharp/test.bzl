@@ -26,6 +26,7 @@ def _compile_action(ctx, tfm):
         additionalfiles = ctx.files.additionalfiles,
         direct_analyzers = ctx.attr.analyzers,
         debug = is_debug(ctx),
+        override_debug = getattr(ctx.attr, "override_debug", False),
         defines = ctx.attr.defines,
         deps = ctx.attr.deps,
         exports = [],

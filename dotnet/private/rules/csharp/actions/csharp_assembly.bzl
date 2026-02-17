@@ -105,6 +105,7 @@ def AssemblyAction(
         additionalfiles,
         direct_analyzers,
         debug,
+        override_debug,
         defines,
         deps,
         exports,
@@ -154,6 +155,7 @@ def AssemblyAction(
         additionalfiles: Names additional files that don't directly affect code generation but may be used by analyzers for producing errors or warnings.
         direct_analyzers: Directly referenced analyzers.
         debug: Emits debugging information.
+        override_debug: When True, skip automatic DEBUG/RELEASE define injection.
         defines: The list of conditional compilation symbols.
         deps: The list of other libraries to be linked in to the assembly.
         exports: List of exported targets.
@@ -270,6 +272,7 @@ def AssemblyAction(
             analyzers_csharp,
             analyzer_configs,
             debug,
+            override_debug,
             defines,
             keyfile,
             langversion,
@@ -321,6 +324,7 @@ def AssemblyAction(
             analyzers_csharp,
             analyzer_configs,
             debug,
+            override_debug,
             defines,
             keyfile,
             langversion,
@@ -361,6 +365,7 @@ def AssemblyAction(
             analyzers_csharp,
             analyzer_configs,
             debug,
+            override_debug,
             defines,
             keyfile,
             langversion,
@@ -438,6 +443,7 @@ def _compile(
         analyzer_assemblies_csharp,
         analyzer_configs,
         debug,
+        override_debug,
         defines,
         keyfile,
         langversion,
@@ -512,7 +518,11 @@ def _compile(
     args.add("/target:" + target)
     args.add("/langversion:" + langversion)
 
-    if debug:
+    if override_debug:
+        # The target controls its own DEBUG/RELEASE defines; only emit
+        # /debug:portable so PDBs are still produced.
+        pass
+    elif debug:
         args.add("/debug+")
         args.add("/optimize-")
         args.add("/define:TRACE")

@@ -76,6 +76,14 @@ COMMON_ATTRS = {
         default = [],
         allow_empty = True,
     ),
+    "override_debug": attr.bool(
+        doc = "When True, skip automatic injection of /define:DEBUG or /define:RELEASE " +
+              "based on compilation mode. The target's 'defines' attribute becomes the " +
+              "sole source of DEBUG/RELEASE defines. Also skips automatic /optimize and " +
+              "/debug flags. Useful when a managed assembly must match a separately " +
+              "configured native component (e.g. System.Private.CoreLib matching the CLR).",
+        default = False,
+    ),
     "internals_visible_to": attr.string_list(
         doc = "Other libraries that can see the assembly's internal symbols. Using this rather than the InternalsVisibleTo assembly attribute will improve build caching.",
     ),
