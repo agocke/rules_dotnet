@@ -246,7 +246,11 @@ def AssemblyAction(
         cls_compliant = cls_compliant,
         assembly_version = assembly_version)
 
-    all_srcs = srcs + [assembly_info_cs]
+    # Only include the auto-generated AssemblyInfo if it has content
+    if assembly_version != "" or cls_compliant:
+        all_srcs = srcs + [assembly_info_cs]
+    else:
+        all_srcs = list(srcs)
 
     # Build the list of resource files with explicit logical names and a
     # lookup map from file path to logical name.  resource_logical_names is a
