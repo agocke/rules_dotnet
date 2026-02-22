@@ -46,6 +46,7 @@ group rules_dotnet_nuget_packages
 
     nuget NUnit 3.14.0
     nuget NUnitLite 3.14.0
+    nuget Google.Protobuf 3.29.3
 
 group rules_dotnet_nuget_tool_tests
     framework: net9.0

@@ -143,7 +143,9 @@ def AssemblyAction(
         analyzer_configs,
         compiler_options,
         ref_assembly,
-        is_windows):
+        is_windows,
+        compiler_worker = None,
+        use_compiler_worker = False):
     """Creates an action that runs the CSharp compiler with the specified inputs.
 
     This macro aims to match the [C# compiler](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically), with the inputs mapping to compiler options.
@@ -305,6 +307,8 @@ def AssemblyAction(
             out_ref = out_ref,
             out_pdb = out_pdb,
             out_xml = out_xml,
+            compiler_worker = compiler_worker,
+            use_compiler_worker = use_compiler_worker,
         )
     else:
         # If the user is using internals_visible_to generate an additional
@@ -357,6 +361,8 @@ def AssemblyAction(
             out_dll = out_dll,
             out_pdb = out_pdb,
             out_xml = out_xml,
+            compiler_worker = compiler_worker,
+            use_compiler_worker = use_compiler_worker,
         )
 
         # Generate a ref-only DLL without internals
@@ -398,6 +404,8 @@ def AssemblyAction(
             out_ref = out_ref,
             out_pdb = None,
             out_xml = None,
+            compiler_worker = compiler_worker,
+            use_compiler_worker = use_compiler_worker,
         )
 
     return (DotnetAssemblyCompileInfo(
@@ -475,7 +483,9 @@ def _compile(
         out_dll = None,
         out_ref = None,
         out_pdb = None,
-        out_xml = None):
+        out_xml = None,
+        compiler_worker = None,
+        use_compiler_worker = False):
 
     # Our goal is to match msbuild as much as reasonable
     # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically
@@ -594,26 +604,53 @@ def _compile(
     direct_inputs = srcs + resources + resource_logical_name_files + additionalfiles + analyzer_configs + [toolchain.csharp_compiler.files_to_run.executable]
     direct_inputs += [keyfile] if keyfile else []
 
-    # dotnet.exe csc.dll /noconfig <other csc args>
-    # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/command-line-building-with-csc-exe
-    actions.run(
-        mnemonic = "CSharpCompile",
-        progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
-        inputs = depset(
-            direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
-            transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
-        ),
-        outputs = outputs,
-        executable = compiler_wrapper,
-        arguments = [
-            toolchain.runtime.files_to_run.executable.path,
-            toolchain.csharp_compiler.files_to_run.executable.path,
-            args,
-        ],
-        env = {
-            "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
-        },
-    )
+    if use_compiler_worker and compiler_worker:
+        # Use persistent worker mode: worker binary speaks Bazel's worker
+        # protocol and invokes csc with /shared for compiler server support.
+        # dotnet_path and csc_path are passed via env vars (constant across requests).
+        # WorkRequest.arguments receives the csc args (from the Args param file).
+        worker_inputs = direct_inputs + framework_files + [toolchain.runtime.files_to_run.executable]
+        actions.run(
+            mnemonic = "CSharpCompile",
+            progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
+            inputs = depset(
+                direct = worker_inputs,
+                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
+            ),
+            outputs = outputs,
+            executable = compiler_worker,
+            arguments = [args],
+            env = {
+                "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
+                "DOTNET_WORKER_RUNTIME": toolchain.runtime.files_to_run.executable.path,
+                "DOTNET_WORKER_CSC": toolchain.csharp_compiler.files_to_run.executable.path,
+            },
+            execution_requirements = {
+                "supports-workers": "1",
+            },
+        )
+    else:
+        # Classic mode: use the shell/batch compiler wrapper.
+        # dotnet.exe csc.dll /noconfig <other csc args>
+        # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/command-line-building-with-csc-exe
+        actions.run(
+            mnemonic = "CSharpCompile",
+            progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
+            inputs = depset(
+                direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
+                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
+            ),
+            outputs = outputs,
+            executable = compiler_wrapper,
+            arguments = [
+                toolchain.runtime.files_to_run.executable.path,
+                toolchain.csharp_compiler.files_to_run.executable.path,
+                args,
+            ],
+            env = {
+                "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
+            },
+        )
 
 def aliased_to_files(alias_depset):
     if type(alias_depset) == "depset":

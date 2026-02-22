@@ -6,3 +6,24 @@ bool_flag(
     build_setting_default = True,
     visibility = ["//visibility:public"],
 )
+
+# A flag controlling if the persistent worker compiler should be used.
+# When enabled, C# compilations use a Bazel persistent worker that invokes
+# csc with /shared to leverage the Roslyn compiler server.
+# To use, set --//dotnet/settings:use_compiler_worker=True and ensure your
+# csharp_binary/library/test rules have _compiler_worker set to the worker target.
+bool_flag(
+    name = "use_compiler_worker",
+    build_setting_default = False,
+    visibility = ["//visibility:public"],
+)
+
+# Config setting that matches when the compiler worker is enabled.
+# Used in select() to conditionally add the compiler worker dependency.
+config_setting(
+    name = "use_compiler_worker_enabled",
+    flag_values = {
+        ":use_compiler_worker": "True",
+    },
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,20 @@
+load(
+    "//dotnet/private/rules/csharp:binary.bzl",
+    "csharp_binary",
+)
+
+# Use the raw rule directly (not the macro from defs.bzl) to avoid a
+# circular dependency: the macro sets compiler_worker = this target,
+# which would create a self-loop.
+csharp_binary(
+    name = "compiler_worker",
+    srcs = [
+        "Program.cs",
+        "WorkerProtocol.cs",
+    ],
+    target_frameworks = ["net10.0"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "@paket.rules_dotnet_nuget_packages//google.protobuf",
+    ],
+)
