@@ -4,21 +4,20 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using Google.Protobuf;
 
 namespace CompilerWorker;
 
 internal static class Program
 {
     // Paths set via env vars at worker startup (constant across requests)
-    static string? s_dotnetPath;
-    static string? s_cscPath;
+    static readonly string? s_dotnetPath = Environment.GetEnvironmentVariable("DOTNET_WORKER_RUNTIME");
+    static readonly string? s_cscPath = Environment.GetEnvironmentVariable("DOTNET_WORKER_CSC");
 
     static int Main(string[] args)
     {
         if (Array.Exists(args, a => a == "--persistent_worker"))
         {
-            s_dotnetPath = Environment.GetEnvironmentVariable("DOTNET_WORKER_RUNTIME");
-            s_cscPath = Environment.GetEnvironmentVariable("DOTNET_WORKER_CSC");
             if (string.IsNullOrEmpty(s_dotnetPath) || string.IsNullOrEmpty(s_cscPath))
             {
                 Console.Error.WriteLine("DOTNET_WORKER_RUNTIME and DOTNET_WORKER_CSC env vars must be set in worker mode");
@@ -39,39 +38,45 @@ internal static class Program
         var stdin = Console.OpenStandardInput();
         var stdout = Console.OpenStandardOutput();
 
+        // Shut down VBCSCompiler when this process is terminated
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => ShutdownBuildServer();
+
         // Redirect Console.Out/Error to stderr so only protobuf goes to stdout
         Console.SetOut(new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true });
         Console.SetError(new StreamWriter(Console.OpenStandardError(), Encoding.UTF8) { AutoFlush = true });
 
-        while (true)
+        try
         {
-            WorkRequest? request;
-            try
+            while (true)
             {
-                request = WorkRequest.ReadDelimitedFrom(stdin);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Error reading WorkRequest: {ex.Message}");
-                return 1;
-            }
-
-            if (request == null)
-                break; // stdin closed
-
-            if (request.Cancel)
-            {
-                var cancelResponse = new WorkResponse
+                WorkRequest request;
+                try
                 {
-                    RequestId = request.RequestId,
-                    WasCancelled = true,
-                };
-                cancelResponse.WriteDelimitedTo(stdout);
-                continue;
-            }
+                    request = WorkRequest.Parser.ParseDelimitedFrom(stdin);
+                }
+                catch (InvalidProtocolBufferException)
+                {
+                    break; // stdin closed or malformed - EOF
+                }
 
-            var response = HandleRequest(request);
-            response.WriteDelimitedTo(stdout);
+                if (request.Cancel)
+                {
+                    var cancelResponse = new WorkResponse
+                    {
+                        RequestId = request.RequestId,
+                        WasCancelled = true,
+                    };
+                    cancelResponse.WriteDelimitedTo(stdout);
+                    continue;
+                }
+
+                var response = HandleRequest(request);
+                response.WriteDelimitedTo(stdout);
+            }
+        }
+        finally
+        {
+            ShutdownBuildServer();
         }
 
         return 0;
@@ -90,8 +95,11 @@ internal static class Program
             string cscPath = s_cscPath!;
 
             // WorkRequest.arguments contains the csc args (possibly as @paramfile or inline).
+            // -shared must precede @paramfile so VBCSCompiler's BuildClient sees it
+            // before expanding the response file.
             var cscArgs = new StringBuilder();
             cscArgs.Append('"').Append(cscPath).Append('"');
+            cscArgs.Append(" -shared");
             foreach (var arg in request.Arguments)
             {
                 cscArgs.Append(' ');
@@ -110,7 +118,7 @@ internal static class Program
                 }
             }
 
-            // Inject pathmap for deterministic builds and /shared for compiler server
+            // Inject pathmap for deterministic builds
             string workingDir = request.SandboxDir.Length > 0
                 ? Path.GetFullPath(request.SandboxDir)
                 : Directory.GetCurrentDirectory();
@@ -120,7 +128,6 @@ internal static class Program
                 : $"-pathmap:{workingDir}=.";
 
             cscArgs.Append(' ').Append(pathmapFlag);
-            cscArgs.Append(" /shared");
 
             var psi = new ProcessStartInfo
             {
@@ -177,6 +184,7 @@ internal static class Program
 
         var cscArgs = new StringBuilder();
         cscArgs.Append('"').Append(cscPath).Append('"');
+        cscArgs.Append(" -shared");
         for (int i = 2; i < args.Length; i++)
         {
             cscArgs.Append(' ');
@@ -187,13 +195,12 @@ internal static class Program
                 cscArgs.Append(arg);
         }
 
-        // Inject pathmap and /shared
+        // Inject pathmap for deterministic builds
         string pathmapFlag = cscPath.EndsWith("fsc.dll", StringComparison.OrdinalIgnoreCase)
             ? $"--pathmap:{Directory.GetCurrentDirectory()}=."
             : $"-pathmap:{Directory.GetCurrentDirectory()}=.";
 
         cscArgs.Append(' ').Append(pathmapFlag);
-        cscArgs.Append(" /shared");
 
         var psi = new ProcessStartInfo
         {
@@ -206,5 +213,32 @@ internal static class Program
         using var process = Process.Start(psi)!;
         process.WaitForExit();
         return process.ExitCode;
+    }
+
+    /// <summary>
+    /// Shuts down the VBCSCompiler server so it doesn't linger after the worker exits.
+    /// </summary>
+    static void ShutdownBuildServer()
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = s_dotnetPath!,
+                Arguments = "build-server shutdown",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+            psi.Environment["DOTNET_CLI_HOME"] = Path.GetDirectoryName(s_dotnetPath!)!;
+
+            using var process = Process.Start(psi)!;
+            process.WaitForExit(TimeSpan.FromSeconds(5));
+        }
+        catch
+        {
+            // Best-effort cleanup; don't fail the worker exit.
+        }
     }
 }

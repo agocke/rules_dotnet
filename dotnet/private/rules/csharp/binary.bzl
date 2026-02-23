@@ -62,8 +62,8 @@ def _compile_action(ctx, tfm):
         compiler_options = ctx.attr.compiler_options,
         ref_assembly = False,
         is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]),
-        compiler_worker = ctx.executable.compiler_worker if hasattr(ctx.attr, "compiler_worker") and ctx.attr.compiler_worker else None,
-        use_compiler_worker = ctx.attr._use_compiler_worker[BuildSettingInfo].value if hasattr(ctx.attr, "_use_compiler_worker") else False,
+        shared_compilation_worker = ctx.executable.shared_compilation_worker if ctx.attr.use_shared_compilation else None,
+        use_shared_compilation = ctx.attr.use_shared_compilation,
     )
 
 def _binary_private_impl(ctx):

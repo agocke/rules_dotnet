@@ -153,6 +153,7 @@ RESTRICTION: == net9.0
 NUGET
   remote: https://api.nuget.org/v3/index.json
     Google.Protobuf (3.29.3)
+    Grpc.Tools (2.68.1)
     Microsoft.NETCore.Platforms (6.0.5)
     NETStandard.Library (2.0.3)
       Microsoft.NETCore.Platforms (>= 1.1)

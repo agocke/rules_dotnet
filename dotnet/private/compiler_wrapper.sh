@@ -15,10 +15,5 @@ if [[ $(basename "$COMPILER") == "fsc.dll" ]]; then
 fi
 PATHMAP="$PATHMAP_FLAG:$PWD=."
 
-SHARED_FLAG=""
-if [[ "${DOTNET_SHARED_COMPILATION:-}" == "1" ]]; then
-  SHARED_FLAG="/shared"
-fi
-
 # shellcheck disable=SC2145
-./"$@" "$PATHMAP" $SHARED_FLAG
+./"$@" "$PATHMAP"

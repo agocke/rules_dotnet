@@ -144,8 +144,8 @@ def AssemblyAction(
         compiler_options,
         ref_assembly,
         is_windows,
-        compiler_worker = None,
-        use_compiler_worker = False):
+        shared_compilation_worker = None,
+        use_shared_compilation = False):
     """Creates an action that runs the CSharp compiler with the specified inputs.
 
     This macro aims to match the [C# compiler](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically), with the inputs mapping to compiler options.
@@ -307,8 +307,8 @@ def AssemblyAction(
             out_ref = out_ref,
             out_pdb = out_pdb,
             out_xml = out_xml,
-            compiler_worker = compiler_worker,
-            use_compiler_worker = use_compiler_worker,
+            shared_compilation_worker = shared_compilation_worker,
+            use_shared_compilation = use_shared_compilation,
         )
     else:
         # If the user is using internals_visible_to generate an additional
@@ -361,8 +361,8 @@ def AssemblyAction(
             out_dll = out_dll,
             out_pdb = out_pdb,
             out_xml = out_xml,
-            compiler_worker = compiler_worker,
-            use_compiler_worker = use_compiler_worker,
+            shared_compilation_worker = shared_compilation_worker,
+            use_shared_compilation = use_shared_compilation,
         )
 
         # Generate a ref-only DLL without internals
@@ -404,8 +404,8 @@ def AssemblyAction(
             out_ref = out_ref,
             out_pdb = None,
             out_xml = None,
-            compiler_worker = compiler_worker,
-            use_compiler_worker = use_compiler_worker,
+            shared_compilation_worker = shared_compilation_worker,
+            use_shared_compilation = use_shared_compilation,
         )
 
     return (DotnetAssemblyCompileInfo(
@@ -484,8 +484,8 @@ def _compile(
         out_ref = None,
         out_pdb = None,
         out_xml = None,
-        compiler_worker = None,
-        use_compiler_worker = False):
+        shared_compilation_worker = None,
+        use_shared_compilation = False):
 
     # Our goal is to match msbuild as much as reasonable
     # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically
@@ -604,7 +604,7 @@ def _compile(
     direct_inputs = srcs + resources + resource_logical_name_files + additionalfiles + analyzer_configs + [toolchain.csharp_compiler.files_to_run.executable]
     direct_inputs += [keyfile] if keyfile else []
 
-    if use_compiler_worker and compiler_worker:
+    if use_shared_compilation and shared_compilation_worker:
         # Use persistent worker mode: worker binary speaks Bazel's worker
         # protocol and invokes csc with /shared for compiler server support.
         # dotnet_path and csc_path are passed via env vars (constant across requests).
@@ -618,7 +618,7 @@ def _compile(
                 transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
             ),
             outputs = outputs,
-            executable = compiler_worker,
+            executable = shared_compilation_worker,
             arguments = [args],
             env = {
                 "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,

@@ -3,6 +3,19 @@ load(
     "csharp_binary",
 )
 
+genrule(
+    name = "worker_protocol_csharp",
+    srcs = ["worker_protocol.proto"],
+    outs = ["WorkerProtocol.g.cs"],
+    cmd = "PROTOC=$$(echo '$(locations @paket.rules_dotnet_nuget_packages//grpc.tools:files)' | tr ' ' '\\n' | grep 'tools/linux_x64/protoc$$') && " +
+          "$$PROTOC" +
+          " --csharp_out=$(RULEDIR)" +
+          " --csharp_opt=file_extension=.g.cs" +
+          " --proto_path=$$(dirname $(location worker_protocol.proto))" +
+          " $(location worker_protocol.proto)",
+    tools = ["@paket.rules_dotnet_nuget_packages//grpc.tools:files"],
+)
+
 # Use the raw rule directly (not the macro from defs.bzl) to avoid a
 # circular dependency: the macro sets compiler_worker = this target,
 # which would create a self-loop.
@@ -10,7 +23,7 @@ csharp_binary(
     name = "compiler_worker",
     srcs = [
         "Program.cs",
-        "WorkerProtocol.cs",
+        ":worker_protocol_csharp",
     ],
     target_frameworks = ["net10.0"],
     visibility = ["//visibility:public"],

@@ -5,12 +5,12 @@ Users should not load files under "/dotnet"
 
 load(
     "//dotnet/private/rules/csharp:binary.bzl",
-    _csharp_binary_rule = "csharp_binary",
+    _csharp_binary = "csharp_binary",
     _compile_csharp_exe = "compile_csharp_exe",
 )
 load(
     "//dotnet/private/rules/csharp:library.bzl",
-    _csharp_library_rule = "csharp_library",
+    _csharp_library = "csharp_library",
 )
 load(
     "//dotnet/private/rules/csharp:nunit_test.bzl",
@@ -18,7 +18,7 @@ load(
 )
 load(
     "//dotnet/private/rules/csharp:test.bzl",
-    _csharp_test_rule = "csharp_test",
+    _csharp_test = "csharp_test",
 )
 load(
     "//dotnet/private/rules/fsharp:binary.bzl",
@@ -58,43 +58,28 @@ load(
     _publish_binary = "publish_binary",
 )
 
-_COMPILER_WORKER_SELECT = select({
-    "//dotnet/settings:use_compiler_worker_enabled": Label("//dotnet/private/tools/compiler_worker"),
-    "//conditions:default": None,
-})
+_SHARED_COMPILATION_WORKER = "//dotnet/private/tools/compiler_worker"
 
-def csharp_binary(name, compiler_worker = _COMPILER_WORKER_SELECT, **kwargs):
-    """Compile a C# exe. Wraps the underlying rule to enable persistent worker compilation.
+def csharp_binary(use_shared_compilation = False, **kwargs):
+    _csharp_binary(
+        use_shared_compilation = use_shared_compilation,
+        shared_compilation_worker = _SHARED_COMPILATION_WORKER if use_shared_compilation else None,
+        **kwargs
+    )
 
-    Args:
-        name: Target name.
-        compiler_worker: The compiler worker binary. Automatically set based on the
-            use_compiler_worker flag. Set to None to disable worker compilation for this target.
-        **kwargs: Additional arguments passed to the underlying csharp_binary rule.
-    """
-    _csharp_binary_rule(name = name, compiler_worker = compiler_worker, **kwargs)
+def csharp_library(use_shared_compilation = False, **kwargs):
+    _csharp_library(
+        use_shared_compilation = use_shared_compilation,
+        shared_compilation_worker = _SHARED_COMPILATION_WORKER if use_shared_compilation else None,
+        **kwargs
+    )
 
-def csharp_library(name, compiler_worker = _COMPILER_WORKER_SELECT, **kwargs):
-    """Compile a C# library. Wraps the underlying rule to enable persistent worker compilation.
-
-    Args:
-        name: Target name.
-        compiler_worker: The compiler worker binary. Automatically set based on the
-            use_compiler_worker flag. Set to None to disable worker compilation for this target.
-        **kwargs: Additional arguments passed to the underlying csharp_library rule.
-    """
-    _csharp_library_rule(name = name, compiler_worker = compiler_worker, **kwargs)
-
-def csharp_test(name, compiler_worker = _COMPILER_WORKER_SELECT, **kwargs):
-    """Compile a C# test. Wraps the underlying rule to enable persistent worker compilation.
-
-    Args:
-        name: Target name.
-        compiler_worker: The compiler worker binary. Automatically set based on the
-            use_compiler_worker flag. Set to None to disable worker compilation for this target.
-        **kwargs: Additional arguments passed to the underlying csharp_test rule.
-    """
-    _csharp_test_rule(name = name, compiler_worker = compiler_worker, **kwargs)
+def csharp_test(use_shared_compilation = False, **kwargs):
+    _csharp_test(
+        use_shared_compilation = use_shared_compilation,
+        shared_compilation_worker = _SHARED_COMPILATION_WORKER if use_shared_compilation else None,
+        **kwargs
+    )
 
 compile_csharp_exe = _compile_csharp_exe
 csharp_nunit_test = _csharp_nunit_test
