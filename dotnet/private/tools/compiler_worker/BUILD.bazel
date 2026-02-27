@@ -7,7 +7,11 @@ genrule(
     name = "worker_protocol_csharp",
     srcs = ["worker_protocol.proto"],
     outs = ["WorkerProtocol.g.cs"],
-    cmd = "PROTOC=$$(echo '$(locations @paket.rules_dotnet_nuget_packages//grpc.tools:files)' | tr ' ' '\\n' | grep 'tools/linux_x64/protoc$$') && " +
+    cmd = "UNAME_S=$$(uname -s) && UNAME_M=$$(uname -m) && " +
+          "if [ \"$$UNAME_S\" = \"Darwin\" ]; then PLAT=macosx_x64; " +
+          "elif [ \"$$UNAME_M\" = \"aarch64\" ]; then PLAT=linux_arm64; " +
+          "else PLAT=linux_x64; fi && " +
+          "PROTOC=$$(echo '$(locations @paket.rules_dotnet_nuget_packages//grpc.tools:files)' | tr ' ' '\\n' | grep \"tools/$${PLAT}/protoc\\$$\") && " +
           "$$PROTOC" +
           " --csharp_out=$(RULEDIR)" +
           " --csharp_opt=file_extension=.g.cs" +
