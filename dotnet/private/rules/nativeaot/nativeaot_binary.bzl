@@ -498,7 +498,16 @@ def _nativeaot_binary_impl(ctx):
     #   Microsoft.NETCore.Native.Unix.targets (SetupOSSpecificProps)
     #   Microsoft.NETCore.Native.Windows.targets (SetupOSSpecificProps)
     #
-    output_exe = ctx.actions.declare_file(ctx.label.name)
+
+    # MSBuild: StripSymbols defaults to true on non-Windows.
+    # When stripping, link to a pre-strip file and run objcopy/dsymutil+strip as a post step.
+    strip_symbols = ctx.attr.strip_symbols and target_os != "windows"
+    is_apple = (target_os == "osx")
+
+    if strip_symbols:
+        link_output = ctx.actions.declare_file(ctx.label.name + ".unstripped")
+    else:
+        link_output = ctx.actions.declare_file(ctx.label.name)
 
     cc_toolchain = ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"].cc
 
@@ -511,9 +520,9 @@ def _nativeaot_binary_impl(ctx):
     additional_linker_inputs = []
 
     if target_os == "linux" or target_os == "osx":
-        _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_os, target_arch, ctx, additional_linker_inputs)
+        _add_unix_link_args(link_args, obj_file, link_output, nativeaot_pack, target_os, target_arch, ctx, additional_linker_inputs)
     elif target_os == "windows":
-        _add_windows_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_arch, ctx)
+        _add_windows_link_args(link_args, obj_file, link_output, nativeaot_pack, target_arch, ctx)
 
     # Extra linker flags from the user
     for flag in ctx.attr.extra_linker_args:
@@ -526,10 +535,97 @@ def _nativeaot_binary_impl(ctx):
             linker_inputs + additional_linker_inputs,
             transitive = [cc_toolchain.all_files],
         ),
-        outputs = [output_exe],
+        outputs = [link_output],
         mnemonic = "NativeAotLink",
         progress_message = "Linking NativeAOT binary %s" % ctx.label.name,
     )
+
+    # MSBuild: StripSymbols post-link step.
+    # See https://github.com/dotnet/runtime/blob/5d3288d/eng/native/functions.cmake#L374
+    #
+    # Linux (non-Apple):
+    #   When NativeDebugSymbols:
+    #     1. objcopy --only-keep-debug binary binary.dbg
+    #     2. objcopy --strip-debug --strip-unneeded binary
+    #     3. objcopy --add-gnu-debuglink=binary.dbg binary
+    #   Without NativeDebugSymbols:
+    #     1. objcopy --strip-debug --strip-unneeded binary
+    #
+    # Apple:
+    #   1. dsymutil [--minimize] binary  (creates .dSYM bundle)
+    #   2. strip -no_code_signature_warning -x binary
+    #
+    # MSBuild probes for llvm-objcopy (when using clang) and falls back to objcopy.
+    if strip_symbols:
+        output_exe = ctx.actions.declare_file(ctx.label.name)
+        strip_outputs = [output_exe]
+
+        if is_apple:
+            # Apple: dsymutil + strip
+            # dsymutil creates a .dSYM directory (bundle); we declare it as a tree artifact
+            if ctx.attr.debug_symbols:
+                dsym_dir = ctx.actions.declare_directory(ctx.label.name + ".dSYM")
+                strip_outputs.append(dsym_dir)
+                strip_cmd = (
+                    "cp '{src}' '{dst}' && " +
+                    "dsymutil --minimize '{dst}' -o '{dsym}' && " +
+                    "strip -no_code_signature_warning -x '{dst}'"
+                ).format(
+                    src = link_output.path,
+                    dst = output_exe.path,
+                    dsym = dsym_dir.path,
+                )
+            else:
+                strip_cmd = (
+                    "cp '{src}' '{dst}' && " +
+                    "strip -no_code_signature_warning -x '{dst}'"
+                ).format(
+                    src = link_output.path,
+                    dst = output_exe.path,
+                )
+        else:
+            # Linux: objcopy (try llvm-objcopy first, fall back to objcopy)
+            objcopy_cmd = "llvm-objcopy"
+            objcopy_fallback = "objcopy"
+
+            if ctx.attr.debug_symbols:
+                # NativeSymbolExt is .dbg on Linux
+                dbg_file = ctx.actions.declare_file(ctx.label.name + ".dbg")
+                strip_outputs.append(dbg_file)
+                strip_cmd = (
+                    "OBJCOPY=$({objcopy} --version >/dev/null 2>&1 && echo {objcopy} || echo {fallback}) && " +
+                    "cp '{src}' '{dst}' && " +
+                    "\"$OBJCOPY\" --only-keep-debug '{dst}' '{dbg}' && " +
+                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{dst}' && " +
+                    "\"$OBJCOPY\" --add-gnu-debuglink='{dbg}' '{dst}'"
+                ).format(
+                    objcopy = objcopy_cmd,
+                    fallback = objcopy_fallback,
+                    src = link_output.path,
+                    dst = output_exe.path,
+                    dbg = dbg_file.path,
+                )
+            else:
+                strip_cmd = (
+                    "OBJCOPY=$({objcopy} --version >/dev/null 2>&1 && echo {objcopy} || echo {fallback}) && " +
+                    "cp '{src}' '{dst}' && " +
+                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{dst}'"
+                ).format(
+                    objcopy = objcopy_cmd,
+                    fallback = objcopy_fallback,
+                    src = link_output.path,
+                    dst = output_exe.path,
+                )
+
+        ctx.actions.run_shell(
+            command = strip_cmd,
+            inputs = [link_output],
+            outputs = strip_outputs,
+            mnemonic = "NativeAotStrip",
+            progress_message = "Stripping NativeAOT binary %s" % ctx.label.name,
+        )
+    else:
+        output_exe = link_output
 
     return [
         DefaultInfo(
@@ -688,6 +784,12 @@ nativeaot_binary = rule(
         "compress_symbols": attr.bool(
             doc = "Compress debug symbols with zlib (-gz=zlib). " +
                   "Maps to MSBuild CompressSymbols (default true on Unix).",
+            default = True,
+        ),
+        "strip_symbols": attr.bool(
+            doc = "Strip debug and unneeded symbols from the output binary using objcopy. " +
+                  "Maps to MSBuild StripSymbols (default true on non-Windows). " +
+                  "Reduces binary size significantly (e.g., 43MB → 16MB).",
             default = True,
         ),
         "linker_flavor": attr.string(
