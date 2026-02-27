@@ -97,3 +97,14 @@ DotnetApphostPackInfo = provider(
         "apphost": "File: The apphost file",
     },
 )
+
+DotnetNativeAotPackInfo = provider(
+    doc = "Information about a NativeAOT compilation pack (ILC + runtime libraries).",
+    fields = {
+        "ilc": "File: The ILC compiler executable",
+        "ilc_files": "depset[File]: All files needed to run ILC",
+        "framework_files": "list[File]: NativeAOT framework assemblies",
+        "runtime_libs": "list[File]: Static libraries for native linking (bootstrapper, GC, etc.)",
+        "mibc_files": "list[File]: PGO optimization data files",
+    },
+)

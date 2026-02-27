@@ -57,6 +57,14 @@ load(
     "//dotnet/private/rules/publish_binary:publish_binary.bzl",
     _publish_binary = "publish_binary",
 )
+load(
+    "//dotnet/private/rules/nativeaot:nativeaot_binary.bzl",
+    _nativeaot_binary = "nativeaot_binary",
+)
+load(
+    "//dotnet/private/rules/nativeaot:nativeaot_pack.bzl",
+    _nativeaot_pack = "nativeaot_pack",
+)
 
 _SHARED_COMPILATION_WORKER = "//dotnet/private/tools/compiler_worker"
 
@@ -93,3 +101,5 @@ import_dll = _import_dll
 nuget_repo = _nuget_repo
 nuget_archive = _nuget_archive
 dotnet_tool = _dotnet_tool
+nativeaot_binary = _nativeaot_binary
+nativeaot_pack = _nativeaot_pack
