@@ -32,7 +32,7 @@ def _get_target_arch(ctx):
     else:
         fail("Unsupported target architecture for NativeAOT compilation")
 
-def _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_os, target_arch, ctx):
+def _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_os, target_arch, ctx, additional_linker_inputs):
     """Build linker arguments for Unix platforms (Linux and macOS).
 
     Mirrors: Microsoft.NETCore.Native.Unix.targets SetupOSSpecificProps + LinkNative.
@@ -61,15 +61,29 @@ def _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_
     # NativeLibrary items: runtime_libs from the pack (order matters)
     # Includes: managed native shims (System.Native.a, etc.), bootstrapper,
     # Runtime.WorkstationGC, eventpipe, stdc++compat, etc.
+    # Wrap in --start-group/--end-group to handle circular dependencies
+    # between archives (the NativeAOT runtime has internal cross-references).
+    if not is_apple:
+        link_args.add("-Wl,--start-group")
     for lib in nativeaot_pack.runtime_libs:
         link_args.add(lib)
+    if not is_apple:
+        link_args.add("-Wl,--end-group")
 
     # LinkerArg: -fuse-ld=$(LinkerFlavor)
     # MSBuild defaults: lld for freebsd/bionic, bfd for linux.
-    # In Bazel the cc_toolchain controls the linker, but we expose the attr
-    # for users who need to override (e.g. cross-compiling to bionic/freebsd).
-    if ctx.attr.linker_flavor:
-        link_args.add("-fuse-ld=" + ctx.attr.linker_flavor)
+    # Default to lld since we use clang which works best with its own linker.
+    linker_flavor = ctx.attr.linker_flavor if ctx.attr.linker_flavor else "lld"
+    link_args.add("-fuse-ld=" + linker_flavor)
+
+    # MSBuild: write sections.ld linker script for lld (13+) to retain __modules section.
+    # Without this, --gc-sections removes the __modules section that bootstrapper.o
+    # uses to find managed modules at startup via __start___modules/__stop___modules.
+    if not is_apple and linker_flavor == "lld":
+        sections_ld = ctx.actions.declare_file(ctx.label.name + ".sections.ld")
+        ctx.actions.write(sections_ld, "OVERWRITE_SECTIONS { __modules : { KEEP(*(__modules)) } }\n")
+        link_args.add("-T", sections_ld)
+        additional_linker_inputs.append(sections_ld)
 
     # LinkerArg: -gz=zlib (CompressSymbols, default true)
     if ctx.attr.compress_symbols:
@@ -313,6 +327,9 @@ def _nativeaot_binary_impl(ctx):
 
     main_dll = binary_info.dll
 
+    # ILC executable — passed as a separate attr so we get FilesToRun for runfiles
+    ilc_exe = ctx.executable.ilc
+
     # Collect all runtime dependency DLLs
     dep_libs = []
     for dep in binary_info.transitive_runtime_deps:
@@ -322,10 +339,6 @@ def _nativeaot_binary_impl(ctx):
     obj_file = ctx.actions.declare_file(ctx.label.name + ".o")
 
     ilc_args = ctx.actions.args()
-
-    # Use a response file — matches MSBuild's WriteIlcRspFileForCompilation
-    # pattern and avoids ARG_MAX limits with large reference sets.
-    ilc_args.use_param_file("@%s", use_always = True)
     ilc_args.set_param_file_format("multiline")
 
     # Input IL assembly
@@ -378,9 +391,9 @@ def _nativeaot_binary_impl(ctx):
     if ctx.attr.method_body_folding != "none":
         ilc_args.add("--methodbodyfolding:" + ctx.attr.method_body_folding)
 
-    # Stack trace data — MSBuild: enabled by default (frames mode)
+    # Stack trace data — MSBuild: enabled by default
     if ctx.attr.stack_trace_support:
-        ilc_args.add("--stacktracedata:frames")
+        ilc_args.add("--stacktracedata")
 
     # Resilient mode — MSBuild: IlcResilient defaults to true
     if ctx.attr.resilient:
@@ -405,6 +418,12 @@ def _nativeaot_binary_impl(ctx):
     for assembly in ctx.attr.init_assemblies:
         ilc_args.add("--initassembly:" + assembly)
 
+    # Generate unmanaged entrypoints — MSBuild: System.Private.CoreLib by default.
+    # These generate the Rh* helper functions (RhBoxAny, RhNewObject, etc.) that the
+    # NativeAOT runtime expects.
+    for assembly in ctx.attr.generate_unmanaged_entrypoints:
+        ilc_args.add("--generateunmanagedentrypoints:" + assembly)
+
     # Direct P/Invoke
     for pinvoke in ctx.attr.direct_pinvokes:
         ilc_args.add("--directpinvoke:" + pinvoke)
@@ -421,15 +440,52 @@ def _nativeaot_binary_impl(ctx):
         [main_dll] +
         dep_libs +
         nativeaot_pack.framework_files +
-        nativeaot_pack.mibc_files +
-        nativeaot_pack.ilc_files.to_list()
+        nativeaot_pack.mibc_files
     )
 
-    ctx.actions.run(
-        executable = nativeaot_pack.ilc,
-        arguments = [ilc_args],
+    # Collect ILC runfiles as inputs
+    ilc_runfiles = ctx.attr.ilc[DefaultInfo].default_runfiles
+    if ilc_runfiles and ilc_runfiles.files:
+        ilc_inputs = ilc_inputs + ilc_runfiles.files.to_list()
+
+    # Add runfiles.bash so the shell wrapper can resolve its dependencies
+    runfiles_bash_files = ctx.attr._runfiles_bash[DefaultInfo].files.to_list()
+    ilc_inputs = ilc_inputs + runfiles_bash_files
+
+    # Add ILC native libs (jitinterface, clrjit) as inputs
+    ilc_native_lib_files = ctx.files.ilc_native_libs
+    ilc_inputs = ilc_inputs + ilc_native_lib_files
+
+    # Write the ILC arguments to a response file
+    rsp_file = ctx.actions.declare_file(ctx.label.name + ".ilc.rsp")
+    ctx.actions.write(rsp_file, ilc_args)
+    ilc_inputs = ilc_inputs + [rsp_file]
+
+    # Use run_shell with RUNFILES_DIR set explicitly (same pattern as crossgen2.bzl).
+    # Copy native libs next to ILC's assemblies so NativeLibrary.Load can find them.
+    copy_cmds = []
+    for lib in ilc_native_lib_files:
+        # Copy next to the ILC DLL directory and next to the RyuJit assembly
+        copy_cmds.append(
+            "ILC_DIR=$(find \"$RUNFILES_DIR\" -name 'ILCompiler.RyuJit.dll' -print -quit 2>/dev/null | xargs dirname 2>/dev/null) && " +
+            "if [ -n \"$ILC_DIR\" ]; then cp -f \"{src}\" \"$ILC_DIR/{basename}\" 2>/dev/null || true; fi".format(
+                src = lib.path,
+                basename = lib.basename,
+            )
+        )
+
+    cmd = (
+        "RUNFILES_DIR=\"{exe}.runfiles\" && ".format(exe = ilc_exe.path) +
+        "export RUNFILES_DIR && " +
+        (" && ".join(copy_cmds) + " && " if copy_cmds else "") +
+        "{exe} @{rsp}".format(exe = ilc_exe.path, rsp = rsp_file.path)
+    )
+
+    ctx.actions.run_shell(
+        command = cmd,
         inputs = ilc_inputs,
         outputs = [obj_file],
+        tools = [ilc_exe],
         mnemonic = "NativeAotIlc",
         progress_message = "NativeAOT compiling %s" % main_dll.short_path,
     )
@@ -445,23 +501,17 @@ def _nativeaot_binary_impl(ctx):
     output_exe = ctx.actions.declare_file(ctx.label.name)
 
     cc_toolchain = ctx.toolchains["@bazel_tools//tools/cpp:toolchain_type"].cc
-    feature_configuration = cc_common.configure_features(
-        ctx = ctx,
-        cc_toolchain = cc_toolchain,
-    )
 
     link_args = ctx.actions.args()
 
     # Use the C++ compiler as the linker driver (MSBuild: CppLinker = clang/gcc)
-    cc = cc_common.get_tool_for_action(
-        feature_configuration = feature_configuration,
-        action_name = "c++-link-executable",
-    )
+    cc = cc_toolchain.compiler_executable
 
     linker_inputs = [obj_file] + nativeaot_pack.runtime_libs
+    additional_linker_inputs = []
 
     if target_os == "linux" or target_os == "osx":
-        _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_os, target_arch, ctx)
+        _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_os, target_arch, ctx, additional_linker_inputs)
     elif target_os == "windows":
         _add_windows_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_arch, ctx)
 
@@ -473,7 +523,7 @@ def _nativeaot_binary_impl(ctx):
         executable = cc,
         arguments = [link_args],
         inputs = depset(
-            linker_inputs,
+            linker_inputs + additional_linker_inputs,
             transitive = [cc_toolchain.all_files],
         ),
         outputs = [output_exe],
@@ -524,9 +574,22 @@ nativeaot_binary = rule(
             mandatory = True,
         ),
         "nativeaot_pack": attr.label(
-            doc = "The NativeAOT pack providing ILC and runtime libraries.",
+            doc = "The NativeAOT pack providing runtime libraries and framework assemblies.",
             providers = [DotnetNativeAotPackInfo],
             mandatory = True,
+        ),
+        "ilc": attr.label(
+            doc = "The ILC (NativeAOT IL Compiler) executable. Must be a csharp_binary or similar.",
+            executable = True,
+            cfg = "exec",
+            mandatory = True,
+        ),
+        "ilc_native_libs": attr.label_list(
+            doc = "Native shared libraries (.so/.dylib) that ILC needs at runtime " +
+                  "(e.g., jitinterface, clrjit). These are copied next to ILC's DLLs.",
+            allow_files = True,
+            cfg = "exec",
+            default = [],
         ),
         "optimization_mode": attr.string(
             doc = "Optimization mode: 'speed', 'size', or 'blended'. " +
@@ -582,6 +645,12 @@ nativeaot_binary = rule(
             doc = "Assemblies to auto-initialize (e.g., 'System.Private.CoreLib'). " +
                   "Maps to MSBuild AutoInitializedAssemblies.",
             default = [],
+        ),
+        "generate_unmanaged_entrypoints": attr.string_list(
+            doc = "Assemblies to generate unmanaged entrypoints from. " +
+                  "MSBuild defaults to 'System.Private.CoreLib'. These generate " +
+                  "the Rh* runtime helper functions needed by the NativeAOT runtime.",
+            default = ["System.Private.CoreLib"],
         ),
         "direct_pinvokes": attr.string_list(
             doc = "Libraries to direct P/Invoke into (e.g., 'libSystem.Native'). " +
@@ -662,6 +731,9 @@ nativeaot_binary = rule(
         "_x86_64_constraint": attr.label(default = "@platforms//cpu:x86_64"),
         "_x86_constraint": attr.label(default = "@platforms//cpu:x86_32"),
         "_arm64_constraint": attr.label(default = "@platforms//cpu:arm64"),
+        "_runfiles_bash": attr.label(
+            default = Label("@bazel_tools//tools/bash/runfiles"),
+        ),
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
