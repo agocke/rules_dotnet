@@ -1,0 +1,14 @@
+load(
+    "//dotnet:defs.bzl",
+    "csharp_test",
+)
+
+# A csharp_test with is_aot_compatible=True should set runtimeconfig feature switches
+# that disable reflection-based JSON serialization. This test verifies
+# that the feature switches are correctly applied at runtime.
+csharp_test(
+    name = "aot_compat_test",
+    srcs = ["Main.cs"],
+    is_aot_compatible = True,
+    target_frameworks = ["net9.0"],
+)

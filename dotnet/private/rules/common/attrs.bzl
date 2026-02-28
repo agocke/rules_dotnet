@@ -310,6 +310,32 @@ CSHARP_LIBRARY_COMMON_ATTRS = dicts.add(
 CSHARP_BINARY_COMMON_ATTRS = dicts.add(
     CSHARP_COMMON_ATTRS,
     BINARY_COMMON_ATTRS,
+    {
+        "is_aot_compatible": attr.bool(
+            doc = """Whether this binary is compatible with Native AOT compilation.
+            
+            When true, enables AOT/trim analyzers during compilation and sets
+            RuntimeHostConfigurationOption feature switches in the runtimeconfig.json
+            that match the .NET SDK behavior for PublishAot=true.
+            
+            This flag serves as a validation gate for publish_binary(aot=True) — 
+            only binaries with is_aot_compatible=True can be AOT-published.
+            """,
+            default = False,
+        ),
+        "_illink_analyzers_net8": attr.label(
+            default = "@nuget.microsoft.net.illink.tasks.v8.0.22//:analyzers_csharp",
+            allow_files = True,
+        ),
+        "_illink_analyzers_net9": attr.label(
+            default = "@nuget.microsoft.net.illink.tasks.v9.0.11//:analyzers_csharp",
+            allow_files = True,
+        ),
+        "_illink_analyzers_net10": attr.label(
+            default = "@nuget.microsoft.net.illink.tasks.v10.0.0//:analyzers_csharp",
+            allow_files = True,
+        ),
+    },
 )
 
 # These are attributes that are common across all the binary/library/test F# rules

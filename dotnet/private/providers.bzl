@@ -70,6 +70,7 @@ DotnetBinaryInfo = provider(
         "transitive_runtime_deps": "list[DotnetAssemblyRuntimeInfo]: The transitive runtime dependencies of the binary",
         "apphost_pack_info": "DotnetApphostPackInfo: The apphost pack for the binary",
         "runtime_pack_info": "DotnetRuntimePackInfo: The runtime pack for the binary",
+        "is_aot_compatible": "bool: Whether the binary is AOT-compatible",
     },
 )
 

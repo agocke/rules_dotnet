@@ -14,6 +14,31 @@ load("//dotnet/private/rules/common:binary.bzl", "build_binary")
 load("//dotnet/private/rules/csharp/actions:csharp_assembly.bzl", "AssemblyAction")
 load("//dotnet/private/transitions:tfm_transition.bzl", "tfm_transition")
 
+def _get_illink_analyzers(ctx, tfm):
+    """Returns ILLink analyzer files for the given TFM when is_aot_compatible."""
+    if not ctx.attr.is_aot_compatible:
+        return []
+    if tfm.startswith("net10."):
+        return ctx.files._illink_analyzers_net10
+    elif tfm.startswith("net9."):
+        return ctx.files._illink_analyzers_net9
+    else:
+        return ctx.files._illink_analyzers_net8
+
+def _get_aot_analyzer_config(ctx):
+    """Generates a .globalconfig that enables ILLink AOT/trim analyzers."""
+    if not ctx.attr.is_aot_compatible:
+        return []
+    config = ctx.actions.declare_file(ctx.label.name + ".aot.globalconfig")
+    ctx.actions.write(config, "\n".join([
+        "is_global = true",
+        "build_property.EnableAotAnalyzer = true",
+        "build_property.EnableTrimAnalyzer = true",
+        "build_property.EnableSingleFileAnalyzer = true",
+        "",
+    ]))
+    return [config]
+
 def _compile_action(ctx, tfm):
     toolchain = get_toolchain(ctx)
     return AssemblyAction(
@@ -58,12 +83,13 @@ def _compile_action(ctx, tfm):
         run_analyzers = ctx.attr.run_analyzers,
         is_analyzer = False,
         is_language_specific_analyzer = False,
-        analyzer_configs = ctx.files.analyzer_configs,
+        analyzer_configs = ctx.files.analyzer_configs + _get_aot_analyzer_config(ctx),
         compiler_options = ctx.attr.compiler_options,
         ref_assembly = False,
         is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]),
         shared_compilation_worker = ctx.executable.shared_compilation_worker if ctx.attr.use_shared_compilation else None,
         use_shared_compilation = ctx.attr.use_shared_compilation,
+        extra_analyzers_csharp = _get_illink_analyzers(ctx, tfm),
     )
 
 def _binary_private_impl(ctx):

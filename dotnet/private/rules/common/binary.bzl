@@ -112,6 +112,7 @@ def build_binary(ctx, compile_action):
             project_sdk = ctx.attr.project_sdk,
             is_self_contained = False,
             roll_forward_behavior = ctx.attr.roll_forward_behavior,
+            is_aot_compatible = getattr(ctx.attr, "is_aot_compatible", False),
         )
 
         # Add additional lookup paths so that we can avoid copying all DLLs
@@ -181,6 +182,7 @@ def build_binary(ctx, compile_action):
         transitive_runtime_deps = transitive_runtime_deps,
         apphost_pack_info = ctx.attr._apphost_pack[0][DotnetApphostPackInfo],
         runtime_pack_info = ctx.attr._runtime_pack[0][DotnetRuntimePackInfo],
+        is_aot_compatible = getattr(ctx.attr, "is_aot_compatible", False),
     )
 
     return [default_info, dotnet_binary_info, compile_provider, runtime_provider, RunEnvironmentInfo(environment = {key: expand_variables(ctx, expand_locations(ctx, value, ctx.attr.data)) for key, value in ctx.attr.envs.items()})]

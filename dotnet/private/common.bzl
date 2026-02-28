@@ -662,7 +662,7 @@ def generate_depsjson(
     return base
 
 # For runtimeconfig.json spec see https://github.com/dotnet/sdk/blob/main/documentation/specs/runtime-configuration-file.md
-def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info = None):
+def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info = None, is_aot_compatible = False):
     """Generates a runtimeconfig.json file.
 
     Args:
@@ -671,6 +671,7 @@ def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, rol
         is_self_contained: If the target is a self-contained publish.
         roll_forward_behavior: The roll forward behavior to use.
         runtime_pack_info: The DotnetRuntimePackInfo of the runtime pack that is used for a self contained publish.
+        is_aot_compatible: If the target is AOT-compatible, enabling NativeAOT feature switches.
     Returns:
         The runtimeconfig.json file as a struct.
     """
@@ -696,6 +697,20 @@ def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, rol
             frameworks.append({"name": "Microsoft.AspNetCore.App", "version": runtime_version})
 
         base["runtimeOptions"]["frameworks"] = frameworks
+
+    # When AOT-compatible, set the feature switches that the .NET SDK sets for PublishAot=true.
+    # These are passed to ILC via --feature: and --runtimeknob: args at AOT publish time,
+    # but also set in runtimeconfig.json for JIT-mode debugging of AOT-compatible binaries.
+    if is_aot_compatible:
+        base["runtimeOptions"]["configProperties"] = {
+            "System.Diagnostics.Tracing.EventSource.IsSupported": False,
+            "System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported": False,
+            "System.Linq.Enumerable.IsSizeOptimized": True,
+            "System.Linq.Expressions.CanEmitObjectArrayDelegate": False,
+            "System.Text.Json.JsonSerializer.IsReflectionEnabledByDefault": False,
+            "System.Runtime.InteropServices.BuiltInComInterop.IsSupported": False,
+        }
+
     return base
 
 def to_rlocation_path(ctx, file):

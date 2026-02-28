@@ -145,7 +145,8 @@ def AssemblyAction(
         ref_assembly,
         is_windows,
         shared_compilation_worker = None,
-        use_shared_compilation = False):
+        use_shared_compilation = False,
+        extra_analyzers_csharp = []):
     """Creates an action that runs the CSharp compiler with the specified inputs.
 
     This macro aims to match the [C# compiler](https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/listed-alphabetically), with the inputs mapping to compiler options.
@@ -220,6 +221,10 @@ def AssemblyAction(
         exports,
         strict_deps,
     )
+
+    # Augment analyzers_csharp with extra analyzers (e.g. ILLink AOT analyzers)
+    if extra_analyzers_csharp:
+        analyzers_csharp = depset(direct = extra_analyzers_csharp, transitive = [analyzers_csharp])
 
     if (is_analyzer or is_language_specific_analyzer) and target_framework != "netstandard2.0":
         fail("Analyzers must have `target_frameworks = [\"netstandard2.0\"]`.")

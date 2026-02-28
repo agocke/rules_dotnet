@@ -1,0 +1,56 @@
+load("@bazel_lib//:bzl_library.bzl", "bzl_library")
+load(":nativeaot_nuget_pack.bzl", "nativeaot_nuget_pack")
+load(":nativeaot_packs.bzl", "nativeaot_packs")
+
+nativeaot_packs()
+
+label_setting(
+    name = "nativeaot_pack",
+    build_setting_default = ":empty_pack",
+    visibility = ["//visibility:public"],
+)
+
+# This target is only for the default value of the label setting
+# and the transition should always transition from it to something else.
+# Unlike runtime_pack, having no NativeAOT pack is valid (non-AOT builds).
+nativeaot_nuget_pack(
+    name = "empty_pack",
+    ilcompiler_pack = None,
+    visibility = ["//visibility:public"],
+)
+
+bzl_library(
+    name = "dotnet.nativeaot_packs",
+    srcs = ["dotnet.nativeaot_packs.bzl"],
+    visibility = ["//dotnet:__subpackages__"],
+    deps = ["@rules_dotnet//dotnet:defs"],
+)
+
+bzl_library(
+    name = "dotnet.nativeaot_packs_extension",
+    srcs = ["dotnet.nativeaot_packs_extension.bzl"],
+    visibility = ["//dotnet:__subpackages__"],
+    deps = [":dotnet.nativeaot_packs"],
+)
+
+bzl_library(
+    name = "nativeaot_pack_transition",
+    srcs = ["nativeaot_pack_transition.bzl"],
+    visibility = ["//dotnet:__subpackages__"],
+    deps = [
+        ":nativeaot_pack_lookup_table",
+        "//dotnet/private:providers",
+    ],
+)
+
+bzl_library(
+    name = "nativeaot_pack_lookup_table",
+    srcs = ["nativeaot_pack_lookup_table.bzl"],
+    visibility = ["//dotnet:__subpackages__"],
+)
+
+bzl_library(
+    name = "nativeaot_packs",
+    srcs = ["nativeaot_packs.bzl"],
+    visibility = ["//dotnet:__subpackages__"],
+)

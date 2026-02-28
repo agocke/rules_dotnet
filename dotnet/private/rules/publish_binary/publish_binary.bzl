@@ -1,13 +1,15 @@
 """
-Rules for compiling F# binaries.
+Rules for publishing .Net binaries.
 """
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:shell.bzl", "shell")
 load("//dotnet/private:common.bzl", "generate_depsjson", "generate_runtimeconfig")
-load("//dotnet/private:providers.bzl", "DotnetAssemblyCompileInfo", "DotnetAssemblyRuntimeInfo", "DotnetBinaryInfo")
+load("//dotnet/private:providers.bzl", "DotnetAssemblyCompileInfo", "DotnetAssemblyRuntimeInfo", "DotnetBinaryInfo", "DotnetNativeAotPackInfo")
 load("//dotnet/private/transitions:default_transition.bzl", "default_transition")
 load("//dotnet/private/transitions:tfm_transition.bzl", "tfm_transition")
+load("//dotnet/private/sdk/nativeaot_packs:nativeaot_pack_transition.bzl", "nativeaot_pack_transition")
+load(":nativeaot.bzl", "NATIVEAOT_ATTRS", "nativeaot_publish")
 
 def _copy_file(script_body, src, dst, is_windows):
     if is_windows:
@@ -208,6 +210,22 @@ def _generate_depsjson(
     return depsjson_struct
 
 def _publish_binary_impl(ctx):
+    binary_info = ctx.attr.binary[0][DotnetBinaryInfo]
+
+    # AOT publish path
+    if ctx.attr.aot:
+        if not binary_info.is_aot_compatible:
+            fail("publish_binary(aot=True) requires the input binary to have is_aot_compatible=True. " +
+                 "Set is_aot_compatible = True on the csharp_binary target.")
+
+        nativeaot_pack = ctx.attr._nativeaot_pack[0][DotnetNativeAotPackInfo]
+        if nativeaot_pack.ilc == None:
+            fail("No NativeAOT pack available for the target framework/RID. " +
+                 "NativeAOT requires net8.0 or later.")
+
+        return nativeaot_publish(ctx, binary_info, nativeaot_pack)
+
+    # Standard publish path
     assembly_compile_info = ctx.attr.binary[0][DotnetAssemblyCompileInfo]
     assembly_runtime_info = ctx.attr.binary[0][DotnetAssemblyRuntimeInfo]
     binary_info = ctx.attr.binary[0][DotnetBinaryInfo]
@@ -273,8 +291,12 @@ def _publish_binary_impl(ctx):
 # because Bazel does not allow forwarding executable files as they have to be created by the wrapper rule.
 publish_binary = rule(
     _publish_binary_impl,
-    doc = """Publish a .Net binary""",
-    attrs = {
+    doc = """Publish a .Net binary.
+    
+    When aot=True, compiles the binary ahead-of-time into a fully native executable
+    using the NativeAOT ILC compiler. The input binary must have is_aot_compatible=True.
+    """,
+    attrs = dict(NATIVEAOT_ATTRS.items() + {
         "binary": attr.label(
             doc = "The .Net binary that is being published",
             providers = [DotnetBinaryInfo],
@@ -314,13 +336,17 @@ publish_binary = rule(
             default = "//dotnet/private/tools/apphost_shimmer:apphost_shimmer",
             cfg = default_transition,
         ),
+        "_nativeaot_pack": attr.label(
+            default = "//dotnet/private/sdk/nativeaot_packs:nativeaot_pack",
+            cfg = nativeaot_pack_transition,
+        ),
         "_allowlist_function_transition": attr.label(
             default = "@bazel_tools//tools/allowlists/function_transition_allowlist",
         ),
-        "_windows_constraint": attr.label(default = "@platforms//os:windows"),
-    },
+    }.items()),
     toolchains = [
         "//dotnet:toolchain_type",
+        config_common.toolchain_type("@bazel_tools//tools/cpp:toolchain_type", mandatory = False),
     ],
     executable = True,
     cfg = tfm_transition,

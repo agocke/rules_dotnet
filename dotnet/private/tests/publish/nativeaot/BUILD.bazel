@@ -1,0 +1,29 @@
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+load(
+    "//dotnet:defs.bzl",
+    "publish_binary",
+)
+
+publish_binary(
+    name = "nativeaot",
+    aot = True,
+    binary = "//dotnet/private/tests/publish/aot_app",
+    target_framework = "net9.0",
+)
+
+pkg_tar(
+    name = "tar",
+    srcs = [":nativeaot"],
+    mode = "0755",
+    package_dir = "/",
+    strip_prefix = ".",
+)
+
+sh_test(
+    name = "nativeaot_test",
+    srcs = [
+        "test.sh",
+    ],
+    data = [":tar"],
+)

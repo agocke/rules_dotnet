@@ -1,0 +1,12 @@
+load(
+    "//dotnet:defs.bzl",
+    "csharp_binary",
+)
+
+csharp_binary(
+    name = "aot_app",
+    srcs = ["Main.cs"],
+    is_aot_compatible = True,
+    target_frameworks = ["net9.0"],
+    visibility = ["//dotnet/private/tests/publish:__subpackages__"],
+)

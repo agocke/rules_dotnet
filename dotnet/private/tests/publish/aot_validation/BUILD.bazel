@@ -1,0 +1,20 @@
+load("//dotnet:defs.bzl", "publish_binary")
+load(":aot_validation_test.bzl", "aot_validation_test")
+
+# A non-AOT-compatible binary (the default app_to_publish)
+# Attempting to publish with aot=True should fail analysis.
+
+publish_binary(
+    name = "aot_on_non_aot_binary",
+    binary = "//dotnet/private/tests/publish/app_to_publish",
+    aot = True,
+    self_contained = True,
+    target_framework = "net9.0",
+    runtime_identifier = "linux-x64",
+    tags = ["manual"],  # Don't build normally — only via test
+)
+
+aot_validation_test(
+    name = "aot_validation_test",
+    target_under_test = ":aot_on_non_aot_binary",
+)

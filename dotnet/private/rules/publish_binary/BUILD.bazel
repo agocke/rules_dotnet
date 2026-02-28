@@ -1,13 +1,23 @@
 load("@bazel_lib//:bzl_library.bzl", "bzl_library")
 
 bzl_library(
+    name = "nativeaot",
+    srcs = ["nativeaot.bzl"],
+    visibility = [
+        "//dotnet:__subpackages__",
+    ],
+)
+
+bzl_library(
     name = "publish_binary",
     srcs = ["publish_binary.bzl"],
     visibility = [
         "//dotnet:__subpackages__",
     ],
     deps = [
+        ":nativeaot",
         "//dotnet/private:providers",
+        "//dotnet/private/sdk/nativeaot_packs:nativeaot_pack_transition",
         "//dotnet/private/sdk/runtime_packs:runtime_pack_transition",
         "//dotnet/private/transitions:default_transition",
         "//dotnet/private/transitions:tfm_transition",
