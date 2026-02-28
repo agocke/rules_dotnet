@@ -380,14 +380,12 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
                 dsym_dir = ctx.actions.declare_directory(ctx.label.name + ".dSYM")
                 strip_outputs.append(dsym_dir)
                 strip_cmd = (
-                    "cp '{src}' '{dst}' && " +
-                    "dsymutil --minimize '{dst}' -o '{dsym}' && " +
-                    "strip -no_code_signature_warning -x '{dst}'"
+                    "dsymutil --minimize '{src}' -o '{dsym}' && " +
+                    "strip -no_code_signature_warning -x -o '{dst}' '{src}'"
                 ).format(src = link_output.path, dst = output_exe.path, dsym = dsym_dir.path)
             else:
                 strip_cmd = (
-                    "cp '{src}' '{dst}' && " +
-                    "strip -no_code_signature_warning -x '{dst}'"
+                    "strip -no_code_signature_warning -x -o '{dst}' '{src}'"
                 ).format(src = link_output.path, dst = output_exe.path)
         else:
             objcopy_cmd = "llvm-objcopy"
@@ -397,9 +395,8 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
                 strip_outputs.append(dbg_file)
                 strip_cmd = (
                     "OBJCOPY=$({objcopy} --version >/dev/null 2>&1 && echo {objcopy} || echo {fallback}) && " +
-                    "cp '{src}' '{dst}' && " +
-                    "\"$OBJCOPY\" --only-keep-debug '{dst}' '{dbg}' && " +
-                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{dst}' && " +
+                    "\"$OBJCOPY\" --only-keep-debug '{src}' '{dbg}' && " +
+                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{src}' '{dst}' && " +
                     "\"$OBJCOPY\" --add-gnu-debuglink='{dbg}' '{dst}'"
                 ).format(
                     objcopy = objcopy_cmd,
@@ -411,8 +408,7 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
             else:
                 strip_cmd = (
                     "OBJCOPY=$({objcopy} --version >/dev/null 2>&1 && echo {objcopy} || echo {fallback}) && " +
-                    "cp '{src}' '{dst}' && " +
-                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{dst}'"
+                    "\"$OBJCOPY\" --strip-debug --strip-unneeded '{src}' '{dst}'"
                 ).format(
                     objcopy = objcopy_cmd,
                     fallback = objcopy_fallback,
