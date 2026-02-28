@@ -264,6 +264,7 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
     rsp_lines.append("--dehydrate")
     rsp_lines.append("--scanreflection")
     rsp_lines.append("--methodbodyfolding")
+    rsp_lines.append("all")
     rsp_lines.append("--stacktracedata")
     rsp_lines.append("--resilient")
 
