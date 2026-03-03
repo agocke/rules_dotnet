@@ -89,7 +89,7 @@ COMMON_ATTRS = {
     ),
     "cls_compliant": attr.bool(
         doc = "Whether the assembly is CLS compliant.",
-        default = True,
+        default = False,
     ),
     "assembly_version": attr.string(
         doc = "The assembly version.",
