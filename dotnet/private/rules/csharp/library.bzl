@@ -7,6 +7,7 @@ load(
     "//dotnet/private:common.bzl",
     "get_toolchain",
     "is_debug",
+    "resolve_debug_type",
 )
 load("//dotnet/private/rules/common:attrs.bzl", "CSHARP_LIBRARY_COMMON_ATTRS")
 load("//dotnet/private/rules/common:library.bzl", "build_library")
@@ -23,6 +24,7 @@ def _compile_action(ctx, tfm):
         additionalfiles = ctx.files.additionalfiles,
         direct_analyzers = ctx.attr.analyzers,
         debug = is_debug(ctx),
+        debug_type = resolve_debug_type(ctx),
         override_debug = getattr(ctx.attr, "override_debug", False),
         defines = ctx.attr.defines,
         deps = ctx.attr.deps,

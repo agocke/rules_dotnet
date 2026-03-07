@@ -147,6 +147,35 @@ def tfm_to_semver(tfm):
 def is_debug(ctx):
     return ctx.var["COMPILATION_MODE"] == "dbg" or ctx.var["COMPILATION_MODE"] == "fastbuild"
 
+def emit_pdb(ctx):
+    """Whether to emit PDB (debug) assets.
+
+    In fastbuild mode PDBs are suppressed so that comment-only or
+    whitespace-only source changes produce byte-identical DLLs,
+    allowing Bazel to skip rebuilding downstream targets.
+    """
+    return ctx.var["COMPILATION_MODE"] != "fastbuild"
+
+def resolve_debug_type(ctx):
+    """Resolve the effective debug_type for a compilation.
+
+    When the rule's debug_type attribute is "auto", the debug type is
+    derived from the compilation mode and override_debug:
+    - In fastbuild mode, PDBs are suppressed ("none") for cache stability.
+    - When override_debug is True, PDBs are always produced ("portable")
+      because the target manages its own debug flags.
+    - Otherwise, "portable" PDBs are generated.
+
+    When debug_type is set to an explicit value it is returned as-is.
+    """
+    debug_type = getattr(ctx.attr, "debug_type", "auto")
+    if debug_type != "auto":
+        return debug_type
+    override_debug = getattr(ctx.attr, "override_debug", False)
+    if override_debug or emit_pdb(ctx):
+        return "portable"
+    return "none"
+
 def use_highentropyva(tfm):
     return tfm not in ["net20", "net40"]
 

@@ -84,6 +84,15 @@ COMMON_ATTRS = {
               "configured native component (e.g. System.Private.CoreLib matching the CLR).",
         default = False,
     ),
+    "debug_type": attr.string(
+        doc = "Controls PDB / debug info generation, mirroring the csc /debug option. " +
+              "When set to 'auto' (the default), the debug type is derived from the " +
+              "Bazel compilation mode: 'portable' in opt/dbg, 'none' in fastbuild. " +
+              "Set to an explicit value to override: 'portable', 'embedded', 'full', " +
+              "'pdbonly', or 'none'.",
+        default = "auto",
+        values = ["auto", "portable", "embedded", "full", "pdbonly", "none"],
+    ),
     "internals_visible_to": attr.string_list(
         doc = "Other libraries that can see the assembly's internal symbols. Using this rather than the InternalsVisibleTo assembly attribute will improve build caching.",
     ),
