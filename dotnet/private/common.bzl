@@ -312,7 +312,8 @@ def collect_compile_info(name, deps, analyzers, targeting_pack, exports, strict_
                 add_to_output = False
 
         if add_to_output:
-            irefs = assembly.irefs if name in assembly.internals_visible_to else assembly.refs
+            ivt_names = [ivt.split(",")[0] for ivt in assembly.internals_visible_to]
+            irefs = assembly.irefs if name in ivt_names else assembly.refs
             refs = assembly.refs
             irefs = [(iref, assembly.alias) for iref in irefs]
             refs = [(ref, assembly.alias) for ref in refs]
