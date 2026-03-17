@@ -411,7 +411,7 @@ def _compile(
         outputs.append(out_xml)
 
     # assembly references
-    format_ref_arg(args, depset(framework_files, transitive = [refs]))
+    format_ref_arg(args, depset([(f, None) for f in framework_files], transitive = [refs]))
 
     # .fs files
     args.add_all(srcs)
@@ -445,7 +445,7 @@ def _compile(
         progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
         inputs = depset(
             direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
-            transitive = [refs, toolchain.runtime.default_runfiles.files, toolchain.fsharp_compiler.default_runfiles.files, compile_data],
+            transitive = [depset([f for (f, _) in refs.to_list()]), toolchain.runtime.default_runfiles.files, toolchain.fsharp_compiler.default_runfiles.files, compile_data],
         ),
         outputs = outputs,
         executable = compiler_wrapper,
