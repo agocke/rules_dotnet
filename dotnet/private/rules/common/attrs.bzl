@@ -133,6 +133,23 @@ COMMON_ATTRS = {
         mandatory = False,
         default = [],
     ),
+    "pathmap": attr.string_dict(
+        doc = """Additional /pathmap entries for deterministic builds.
+
+Each key is a stable path prefix starting after the Bazel output bin
+directory (e.g. "src/libraries/Foo/impl_Foo/net10.0") and each value
+is the replacement prefix (e.g. "/_/artifacts/obj/Foo/Release/net10.0").
+
+At execution time the compiler wrapper derives the unstable bin
+directory prefix (e.g. "bazel-out/{hash}/bin/") from the /pdb:
+argument and prepends "{cwd}/{bin_prefix}" to each key, producing a
+mapping that is more specific than the default ({cwd}=.) and therefore
+takes precedence via csc's longest-prefix-match semantics.
+
+The default pathmap ({cwd}=.) is always emitted.
+""",
+        default = {},
+    ),
     "dotnet_toolchain": attr.label(
         doc = """The .Net toolchain to use for this target.
 

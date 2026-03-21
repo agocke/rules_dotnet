@@ -90,6 +90,7 @@ def _compile_action(ctx, tfm):
         is_language_specific_analyzer = False,
         analyzer_configs = ctx.files.analyzer_configs + _get_aot_analyzer_config(ctx),
         compiler_options = ctx.attr.compiler_options,
+        pathmap = ctx.attr.pathmap,
         ref_assembly = False,
         is_windows = ctx.target_platform_has_constraint(ctx.attr._windows_constraint[platform_common.ConstraintValueInfo]),
         shared_compilation_worker = ctx.executable.shared_compilation_worker if ctx.attr.use_shared_compilation else None,

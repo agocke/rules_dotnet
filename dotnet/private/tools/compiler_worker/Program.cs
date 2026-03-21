@@ -118,16 +118,74 @@ internal static class Program
                 }
             }
 
-            // Inject pathmap for deterministic builds
+            // Inject pathmap for deterministic builds.
+            // The default mapping normalises the absolute execroot to ".".
             string workingDir = request.SandboxDir.Length > 0
                 ? Path.GetFullPath(request.SandboxDir)
                 : Directory.GetCurrentDirectory();
 
-            string pathmapFlag = cscPath.EndsWith("fsc.dll", StringComparison.OrdinalIgnoreCase)
-                ? $"--pathmap:{workingDir}=."
-                : $"-pathmap:{workingDir}=.";
+            bool isFsc = cscPath.EndsWith("fsc.dll", StringComparison.OrdinalIgnoreCase);
+            string flagPrefix = isFsc ? "--pathmap:" : "-pathmap:";
 
-            cscArgs.Append(' ').Append(pathmapFlag);
+            string defaultPathmap = $"{flagPrefix}{workingDir}=.";
+            cscArgs.Append(' ').Append(defaultPathmap);
+
+            // DOTNET_PATHMAP: semicolon-separated "relpath=target" entries.
+            // Keys are stable relative paths (e.g. "src/libraries/Foo/impl_Foo/net10.0")
+            // that start AFTER the Bazel output bin directory prefix
+            // (e.g. "bazel-out/{hash}/bin/").  The worker derives this unstable
+            // prefix from the /pdb: argument and prepends {cwd}/{prefix} to each
+            // key, producing a more-specific mapping that wins over the default.
+            string? extraPathmap = Environment.GetEnvironmentVariable("DOTNET_PATHMAP");
+            if (!string.IsNullOrEmpty(extraPathmap))
+            {
+                // Find the /pdb: argument to extract the bin directory prefix.
+                string? pdbArg = null;
+                string argsStr = cscArgs.ToString();
+                int pdbIdx = argsStr.IndexOf("/pdb:");
+                if (pdbIdx < 0)
+                    pdbIdx = argsStr.IndexOf("-pdb:");
+                if (pdbIdx >= 0)
+                {
+                    int start = pdbIdx + 5;
+                    int end = argsStr.IndexOf(' ', start);
+                    pdbArg = end > start ? argsStr[start..end] : argsStr[start..];
+                }
+
+                foreach (string entry in extraPathmap.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    int eq = entry.IndexOf('=');
+                    if (eq > 0)
+                    {
+                        string stableKey = entry[..eq];
+                        string target = entry[(eq + 1)..];
+
+                        // Find where the stable key appears in the PDB path
+                        // to derive the bin directory prefix.
+                        string absKey;
+                        if (pdbArg is not null)
+                        {
+                            int keyIdx = pdbArg.IndexOf(stableKey);
+                            if (keyIdx > 0)
+                            {
+                                // Everything before the key is the bin prefix
+                                string binPrefix = pdbArg[..keyIdx];
+                                absKey = Path.Combine(workingDir, binPrefix + stableKey);
+                            }
+                            else
+                            {
+                                absKey = Path.Combine(workingDir, stableKey);
+                            }
+                        }
+                        else
+                        {
+                            absKey = Path.Combine(workingDir, stableKey);
+                        }
+
+                        cscArgs.Append(' ').Append($"{flagPrefix}{absKey}={target}");
+                    }
+                }
+            }
 
             var psi = new ProcessStartInfo
             {

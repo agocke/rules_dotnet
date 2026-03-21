@@ -143,6 +143,7 @@ def AssemblyAction(
         is_language_specific_analyzer,
         analyzer_configs,
         compiler_options,
+        pathmap,
         ref_assembly,
         is_windows,
         shared_compilation_worker = None,
@@ -197,6 +198,7 @@ def AssemblyAction(
         is_language_specific_analyzer: Whether or not the target is a language specific analyzer.
         analyzer_configs: List of analyzer configuration files.
         compiler_options: Additional options to pass to the compiler.
+        pathmap: Dict of relative-path=target-path entries for /pathmap.
         ref_assembly: True if the output assembly is a reference assembly.
         is_windows: Whether or not the target is running on Windows.
     Returns:
@@ -322,6 +324,7 @@ def AssemblyAction(
             nullable,
             run_analyzers,
             compiler_options,
+            pathmap = pathmap,
             out_dll = out_dll,
             out_ref = out_ref,
             out_pdb = out_pdb,
@@ -377,6 +380,7 @@ def AssemblyAction(
             nullable,
             run_analyzers,
             compiler_options,
+            pathmap = pathmap,
             out_ref = out_iref,
             out_dll = out_dll,
             out_pdb = out_pdb,
@@ -421,6 +425,7 @@ def AssemblyAction(
             nullable,
             run_analyzers,
             compiler_options,
+            pathmap = pathmap,
             out_dll = None,
             out_ref = out_ref,
             out_pdb = None,
@@ -502,6 +507,7 @@ def _compile(
         nullable,
         run_analyzers,
         compiler_options,
+        pathmap = {},
         out_dll = None,
         out_ref = None,
         out_pdb = None,
@@ -622,6 +628,11 @@ def _compile(
     for option in compiler_options:
         args.add(option)
 
+    # Serialize additional pathmap entries for the compiler wrapper/worker.
+    # Each entry maps a path relative to the execution root to a target
+    # prefix; the wrapper prepends its absolute cwd to the source side.
+    pathmap_env = ";".join([k + "=" + v for k, v in pathmap.items()]) if pathmap else ""
+
     # spill to a "response file" when the argument list gets too big (Bazel
     # makes that call based on limitations of the OS).
     args.set_param_file_format("multiline")
@@ -637,6 +648,13 @@ def _compile(
         # dotnet_path and csc_path are passed via env vars (constant across requests).
         # WorkRequest.arguments receives the csc args (from the Args param file).
         worker_inputs = direct_inputs + framework_files + [toolchain.runtime.files_to_run.executable]
+        worker_env = {
+            "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
+            "DOTNET_WORKER_RUNTIME": toolchain.runtime.files_to_run.executable.path,
+            "DOTNET_WORKER_CSC": toolchain.csharp_compiler.files_to_run.executable.path,
+        }
+        if pathmap_env:
+            worker_env["DOTNET_PATHMAP"] = pathmap_env
         actions.run(
             mnemonic = "CSharpCompile",
             progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
@@ -647,11 +665,7 @@ def _compile(
             outputs = outputs,
             executable = shared_compilation_worker,
             arguments = [args],
-            env = {
-                "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
-                "DOTNET_WORKER_RUNTIME": toolchain.runtime.files_to_run.executable.path,
-                "DOTNET_WORKER_CSC": toolchain.csharp_compiler.files_to_run.executable.path,
-            },
+            env = worker_env,
             execution_requirements = {
                 "supports-workers": "1",
             },
@@ -660,6 +674,11 @@ def _compile(
         # Classic mode: use the shell/batch compiler wrapper.
         # dotnet.exe csc.dll /noconfig <other csc args>
         # https://docs.microsoft.com/en-us/dotnet/csharp/language-reference/compiler-options/command-line-building-with-csc-exe
+        wrapper_env = {
+            "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
+        }
+        if pathmap_env:
+            wrapper_env["DOTNET_PATHMAP"] = pathmap_env
         actions.run(
             mnemonic = "CSharpCompile",
             progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
@@ -674,9 +693,7 @@ def _compile(
                 toolchain.csharp_compiler.files_to_run.executable.path,
                 args,
             ],
-            env = {
-                "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
-            },
+            env = wrapper_env,
         )
 
 def aliased_to_files(alias_depset):
