@@ -1,9 +1,12 @@
 #nullable enable
 
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using Google.Protobuf;
 
 namespace CompilerWorker;
@@ -30,8 +33,15 @@ internal static class Program
         return RunDirectCompilation(args);
     }
 
+    // Lock to serialize protobuf writes to stdout (required by worker protocol).
+    static readonly object s_stdoutLock = new();
+
+    // In-flight requests tracked for cancellation support.
+    static readonly ConcurrentDictionary<int, CancellationTokenSource> s_pending = new();
+
     /// <summary>
-    /// Persistent worker loop: read WorkRequests from stdin, compile, write WorkResponses to stdout.
+    /// Persistent worker loop: read WorkRequests from stdin, dispatch compilations
+    /// concurrently (multiplex), write WorkResponses to stdout.
     /// </summary>
     static int RunPersistentWorker()
     {
@@ -61,18 +71,58 @@ internal static class Program
 
                 if (request.Cancel)
                 {
-                    var cancelResponse = new WorkResponse
-                    {
-                        RequestId = request.RequestId,
-                        WasCancelled = true,
-                    };
-                    cancelResponse.WriteDelimitedTo(stdout);
+                    if (s_pending.TryGetValue(request.RequestId, out var cts))
+                        cts.Cancel();
+                    // Response is sent by the original task when it observes cancellation.
                     continue;
                 }
 
-                var response = HandleRequest(request);
-                response.WriteDelimitedTo(stdout);
+                if (request.RequestId == 0)
+                {
+                    // Singleplex fallback: process synchronously.
+                    var response = HandleRequest(request, CancellationToken.None);
+                    lock (s_stdoutLock)
+                        response.WriteDelimitedTo(stdout);
+                }
+                else
+                {
+                    // Multiplex: dispatch concurrently.
+                    var cts = new CancellationTokenSource();
+                    s_pending[request.RequestId] = cts;
+                    _ = Task.Run(() =>
+                    {
+                        WorkResponse response;
+                        try
+                        {
+                            response = HandleRequest(request, cts.Token);
+                            if (cts.Token.IsCancellationRequested)
+                            {
+                                response.ExitCode = 1;
+                                response.WasCancelled = true;
+                            }
+                        }
+                        catch (OperationCanceledException)
+                        {
+                            response = new WorkResponse
+                            {
+                                RequestId = request.RequestId,
+                                WasCancelled = true,
+                            };
+                        }
+                        finally
+                        {
+                            s_pending.TryRemove(request.RequestId, out _);
+                            cts.Dispose();
+                        }
+                        lock (s_stdoutLock)
+                            response.WriteDelimitedTo(stdout);
+                    });
+                }
             }
+
+            // Wait for all in-flight requests before shutting down.
+            while (!s_pending.IsEmpty)
+                Thread.Sleep(50);
         }
         finally
         {
@@ -83,9 +133,9 @@ internal static class Program
     }
 
     /// <summary>
-    /// Handles a single compilation request.
+    /// Handles a single compilation request. Thread-safe — may be called concurrently.
     /// </summary>
-    static WorkResponse HandleRequest(WorkRequest request)
+    static WorkResponse HandleRequest(WorkRequest request, CancellationToken cancellationToken)
     {
         var response = new WorkResponse { RequestId = request.RequestId };
 
@@ -202,9 +252,18 @@ internal static class Program
             psi.Environment["DOTNET_CLI_HOME"] = Path.GetDirectoryName(dotnetPath)!;
 
             using var process = Process.Start(psi)!;
+
+            // Kill the compiler process if Bazel cancels this request.
+            using var reg = cancellationToken.Register(() =>
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+            });
+
             string stdoutOutput = process.StandardOutput.ReadToEnd();
             string stderrOutput = process.StandardError.ReadToEnd();
             process.WaitForExit();
+
+            cancellationToken.ThrowIfCancellationRequested();
 
             var output = new StringBuilder();
             if (stdoutOutput.Length > 0) output.Append(stdoutOutput);
@@ -216,6 +275,10 @@ internal static class Program
 
             response.ExitCode = process.ExitCode;
             response.Output = output.ToString();
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

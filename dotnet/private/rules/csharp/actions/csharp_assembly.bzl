@@ -668,6 +668,7 @@ def _compile(
             env = worker_env,
             execution_requirements = {
                 "supports-workers": "1",
+                "supports-multiplex-workers": "1",
             },
         )
     else:
