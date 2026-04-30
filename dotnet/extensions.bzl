@@ -13,10 +13,9 @@ _ATTRS = {
         doc = "Version of the .Net SDK",
     ),
     "csc_bincore": attr.label(
-        doc = "Label pointing to a custom csc.dll file (e.g. from a NuGet package restored " +
-              "via paket). When set, the toolchain uses the containing directory as the " +
-              "compiler instead of the one bundled with the SDK.",
-        allow_single_file = True,
+        doc = "Label pointing to a target (e.g. filegroup) in the package whose directory " +
+              "contains the bincore compiler files. The package directory itself is used as " +
+              "the bincore override (e.g. @roslyn//tasks/netcore/bincore).",
     ),
 }
 

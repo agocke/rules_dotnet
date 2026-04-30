@@ -7,12 +7,12 @@ def _roslyn_compiler_repo_impl(repository_ctx):
         type = "zip",
     )
 
-    repository_ctx.file("BUILD.bazel", """
-exports_files(["tasks/netcore/bincore/csc.dll"])
+    repository_ctx.file("BUILD.bazel", "")
 
+    repository_ctx.file("tasks/netcore/bincore/BUILD.bazel", """
 filegroup(
     name = "bincore",
-    srcs = glob(["tasks/netcore/bincore/**/*"]),
+    srcs = glob(["**/*"]),
     visibility = ["//visibility:public"],
 )
 """)
