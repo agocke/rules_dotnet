@@ -12,11 +12,12 @@ _DOC = "Fetch external tools needed for dotnet toolchain"
 _ATTRS = {
     "dotnet_version": attr.string(mandatory = True, values = TOOL_VERSIONS.keys()),
     "platform": attr.string(mandatory = True, values = PLATFORMS.keys()),
-    "csc_bincore": attr.string(
-        doc = "Path to a directory containing a custom csc.dll and its dependencies. " +
-              "When set, the toolchain uses this compiler instead of the one bundled with the SDK. " +
-              "This is useful when using a newer compiler (e.g. from a NuGet package restored via paket).",
+    "csc_bincore": attr.label(
+        doc = "Label pointing to a custom csc.dll file (e.g. from a NuGet package restored " +
+              "via paket). When set, the toolchain uses the containing directory as the " +
+              "compiler instead of the one bundled with the SDK.",
         mandatory = False,
+        allow_single_file = True,
     ),
 }
 
@@ -29,7 +30,9 @@ def _dotnet_repo_impl(repository_ctx):
 
     csc_bincore = repository_ctx.attr.csc_bincore
     if csc_bincore:
-        repository_ctx.symlink(repository_ctx.path(csc_bincore), "compiler_override/bincore")
+        csc_file = repository_ctx.path(csc_bincore)
+        bincore_dir = csc_file.dirname
+        repository_ctx.symlink(bincore_dir, "compiler_override/bincore")
         csc_binary = "compiler_override/bincore/csc.dll"
         csc_data_glob = "compiler_override/bincore/**/*"
     else:
@@ -149,9 +152,10 @@ def dotnet_register_toolchains(name, dotnet_version, register = True, csc_bincor
         dotnet_version: The .Net SDK version to use e.g. 8.0.100
         register: whether to call through to native.register_toolchains.
             Should be True for WORKSPACE users, but false when used under bzlmod extension
-        csc_bincore: Optional path to a directory containing a custom csc.dll and its
-            dependencies. When set, the toolchain uses this compiler instead of the one
-            bundled with the SDK.
+        csc_bincore: Optional Label pointing to a custom csc.dll file (e.g. from a
+            NuGet package restored via paket). When set, the toolchain uses the
+            containing directory as the compiler instead of the one bundled with
+            the SDK.
         **kwargs: passed to each dotnet_repositories call
     """
     for platform in PLATFORMS.keys():

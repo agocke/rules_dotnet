@@ -12,9 +12,11 @@ _ATTRS = {
     "dotnet_version": attr.string(
         doc = "Version of the .Net SDK",
     ),
-    "csc_bincore": attr.string(
-        doc = "Path to a directory containing a custom csc.dll and its dependencies. " +
-              "When set, the toolchain uses this compiler instead of the one bundled with the SDK.",
+    "csc_bincore": attr.label(
+        doc = "Label pointing to a custom csc.dll file (e.g. from a NuGet package restored " +
+              "via paket). When set, the toolchain uses the containing directory as the " +
+              "compiler instead of the one bundled with the SDK.",
+        allow_single_file = True,
     ),
 }
 
