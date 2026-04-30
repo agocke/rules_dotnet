@@ -113,6 +113,7 @@ def build_binary(ctx, compile_action):
             is_self_contained = False,
             roll_forward_behavior = ctx.attr.roll_forward_behavior,
             is_aot_compatible = getattr(ctx.attr, "is_aot_compatible", False),
+            runtime_version = get_toolchain(ctx).dotnetinfo.runtime_version,
         )
 
         # Add additional lookup paths so that we can avoid copying all DLLs

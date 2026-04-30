@@ -4,7 +4,7 @@ Rules for publishing .Net binaries.
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//lib:shell.bzl", "shell")
-load("//dotnet/private:common.bzl", "generate_depsjson", "generate_runtimeconfig")
+load("//dotnet/private:common.bzl", "generate_depsjson", "generate_runtimeconfig", "get_toolchain")
 load("//dotnet/private:providers.bzl", "DotnetAssemblyCompileInfo", "DotnetAssemblyRuntimeInfo", "DotnetBinaryInfo", "DotnetNativeAotPackInfo")
 load("//dotnet/private/transitions:default_transition.bzl", "default_transition")
 load("//dotnet/private/transitions:tfm_transition.bzl", "tfm_transition")
@@ -185,7 +185,14 @@ def _create_shim_exe(ctx, apphost_pack_info, dll, runtime_identifier):
     return output
 
 def _generate_runtimeconfig(ctx, output, target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info):
-    runtimeconfig_struct = generate_runtimeconfig(target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info)
+    runtimeconfig_struct = generate_runtimeconfig(
+        target_framework,
+        project_sdk,
+        is_self_contained,
+        roll_forward_behavior,
+        runtime_pack_info,
+        runtime_version = get_toolchain(ctx).dotnetinfo.runtime_version,
+    )
 
     ctx.actions.write(
         output = output,

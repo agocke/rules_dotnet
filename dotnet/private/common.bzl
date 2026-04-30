@@ -22,7 +22,7 @@ def _collect_transitive():
         t[framework] = sets.union(sets.make([framework]), *[t[c] for c in compat])
     return t
 
-DEFAULT_TFM = "net10.0"
+DEFAULT_TFM = "net11.0"
 DEFAULT_RID = "base"
 
 # A dict of target frameworks to the set of other framworks it can compile
@@ -75,6 +75,7 @@ FRAMEWORK_COMPATIBILITY = {
     "net8.0": ["net7.0"],
     "net9.0": ["net8.0"],
     "net10.0": ["net9.0"],
+    "net11.0": ["net10.0"],
 }
 
 _subsystem_version = {
@@ -118,6 +119,7 @@ _subsystem_version = {
     "net8.0": None,
     "net9.0": None,
     "net10.0": None,
+    "net11.0": None,
 }
 
 _net = FRAMEWORK_COMPATIBILITY.keys().index("net11")
@@ -184,7 +186,7 @@ def is_standard_framework(tfm):
 
 def is_core_framework(tfm):
     # TODO: Make this work with future versions
-    return tfm.startswith("netcoreapp") or tfm.startswith("net5.0") or tfm.startswith("net6.0") or tfm.startswith("net7.0") or tfm.startswith("net8.0") or tfm.startswith("net9.0") or tfm.startswith("net10.0")
+    return tfm.startswith("netcoreapp") or tfm.startswith("net5.0") or tfm.startswith("net6.0") or tfm.startswith("net7.0") or tfm.startswith("net8.0") or tfm.startswith("net9.0") or tfm.startswith("net10.0") or tfm.startswith("net11.0")
 
 def is_greater_or_equal_framework(tfm1, tfm2):
     """Returns true if tfm1 is greater or equal to tfm2
@@ -692,7 +694,7 @@ def generate_depsjson(
     return base
 
 # For runtimeconfig.json spec see https://github.com/dotnet/sdk/blob/main/documentation/specs/runtime-configuration-file.md
-def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info = None, is_aot_compatible = False):
+def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, roll_forward_behavior, runtime_pack_info = None, is_aot_compatible = False, runtime_version = None):
     """Generates a runtimeconfig.json file.
 
     Args:
@@ -702,6 +704,7 @@ def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, rol
         roll_forward_behavior: The roll forward behavior to use.
         runtime_pack_info: The DotnetRuntimePackInfo of the runtime pack that is used for a self contained publish.
         is_aot_compatible: If the target is AOT-compatible, enabling NativeAOT feature switches.
+        runtime_version: The runtime version to write for framework-dependent apps.
     Returns:
         The runtimeconfig.json file as a struct.
     """
@@ -719,7 +722,7 @@ def generate_runtimeconfig(target_framework, project_sdk, is_self_contained, rol
             frameworks.append({"name": assembly_runtime_info.name, "version": assembly_runtime_info.version})
         base["runtimeOptions"]["includedFrameworks"] = frameworks
     else:
-        runtime_version = tfm_to_semver(target_framework)
+        runtime_version = runtime_version or tfm_to_semver(target_framework)
         frameworks = [
             {"name": "Microsoft.NETCore.App", "version": runtime_version},
         ]

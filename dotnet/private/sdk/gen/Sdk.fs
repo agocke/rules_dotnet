@@ -10,7 +10,7 @@ open System.Collections.Generic
 open NuGet.RuntimeModel
 open System.Net.Http
 
-let private supportedChannels = [ "6.0"; "7.0"; "8.0"; "9.0"; "10.0" ]
+let private supportedChannels = [ "6.0"; "7.0"; "8.0"; "9.0"; "10.0"; "11.0" ]
 
 type File =
     { [<JsonPropertyName "name">]
@@ -97,6 +97,9 @@ let private filterSdkFiles (sdk: Sdk) =
         |> Seq.filter (fun f ->
             // Some releases have .zip and .tar.gz artifacts for linux so we remove the .zip artifacts
             not (f.Rid = "linux-x64" && f.Name.EndsWith(".zip")))
+        |> Seq.filter (fun f ->
+            // Windows releases can include both .zip and .tar.gz SDK artifacts; keep the canonical .zip.
+            not ((f.Rid = "win-x64" || f.Rid = "win-arm64") && f.Name.EndsWith(".tar.gz")))
         |> Seq.filter (fun f ->
             // There were some incorrect preview releases which had arm binaries released as x64 binaries, removing those
             not (f.Rid = "osx-x64" && f.Name.EndsWith("arm64.tar.gz")))

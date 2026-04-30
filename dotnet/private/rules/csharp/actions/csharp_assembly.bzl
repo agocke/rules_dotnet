@@ -639,7 +639,9 @@ def _compile(
 
     args.use_param_file("@%s", use_always = True)
 
-    direct_inputs = srcs + resources + resource_logical_name_files + additionalfiles + analyzer_configs + [toolchain.csharp_compiler.files_to_run.executable]
+    compiler = toolchain.csharp_compiler
+
+    direct_inputs = srcs + resources + resource_logical_name_files + additionalfiles + analyzer_configs + [compiler.files_to_run.executable]
     direct_inputs += [keyfile] if keyfile else []
 
     if use_shared_compilation and shared_compilation_worker:
@@ -651,7 +653,7 @@ def _compile(
         worker_env = {
             "DOTNET_CLI_HOME": toolchain.runtime.files_to_run.executable.dirname,
             "DOTNET_WORKER_RUNTIME": toolchain.runtime.files_to_run.executable.path,
-            "DOTNET_WORKER_CSC": toolchain.csharp_compiler.files_to_run.executable.path,
+            "DOTNET_WORKER_CSC": compiler.files_to_run.executable.path,
         }
         if pathmap_env:
             worker_env["DOTNET_PATHMAP"] = pathmap_env
@@ -660,7 +662,7 @@ def _compile(
             progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
             inputs = depset(
                 direct = worker_inputs,
-                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
+                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, compiler.default_runfiles.files, compile_data],
             ),
             outputs = outputs,
             executable = shared_compilation_worker,
@@ -685,13 +687,13 @@ def _compile(
             progress_message = "Compiling " + target_name + (" (internals ref-only dll)" if out_dll == None else ""),
             inputs = depset(
                 direct = direct_inputs + framework_files + [compiler_wrapper, toolchain.runtime.files_to_run.executable],
-                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, toolchain.csharp_compiler.default_runfiles.files, compile_data],
+                transitive = [aliased_to_files(refs), analyzer_assemblies, analyzer_assemblies_csharp, toolchain.runtime.default_runfiles.files, compiler.default_runfiles.files, compile_data],
             ),
             outputs = outputs,
             executable = compiler_wrapper,
             arguments = [
                 toolchain.runtime.files_to_run.executable.path,
-                toolchain.csharp_compiler.files_to_run.executable.path,
+                compiler.files_to_run.executable.path,
                 args,
             ],
             env = wrapper_env,

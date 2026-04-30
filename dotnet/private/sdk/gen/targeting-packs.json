@@ -165,19 +165,25 @@
     "net8.0": [
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "8.0.22"
+        "version": "8.0.26"
       }
     ],
     "net9.0": [
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "9.0.11"
+        "version": "9.0.15"
       }
     ],
     "net10.0": [
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "10.0.0"
+        "version": "10.0.7"
+      }
+    ],
+    "net11.0": [
+      {
+        "id": "Microsoft.NETCore.App.Ref",
+        "version": "11.0.0-preview.3.26207.106"
       }
     ]
   },
@@ -255,31 +261,41 @@
     "net8.0": [
       {
         "id": "Microsoft.AspNetCore.App.Ref",
-        "version": "8.0.22"
+        "version": "8.0.26"
       },
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "8.0.22"
+        "version": "8.0.26"
       }
     ],
     "net9.0": [
       {
         "id": "Microsoft.AspNetCore.App.Ref",
-        "version": "9.0.11"
+        "version": "9.0.15"
       },
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "9.0.11"
+        "version": "9.0.15"
       }
     ],
     "net10.0": [
       {
         "id": "Microsoft.AspNetCore.App.Ref",
-        "version": "10.0.0"
+        "version": "10.0.7"
       },
       {
         "id": "Microsoft.NETCore.App.Ref",
-        "version": "10.0.0"
+        "version": "10.0.7"
+      }
+    ],
+    "net11.0": [
+      {
+        "id": "Microsoft.AspNetCore.App.Ref",
+        "version": "11.0.0-preview.3.26207.106"
+      },
+      {
+        "id": "Microsoft.NETCore.App.Ref",
+        "version": "11.0.0-preview.3.26207.106"
       }
     ]
   }
