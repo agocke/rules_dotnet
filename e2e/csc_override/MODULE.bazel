@@ -1,0 +1,27 @@
+"e2e test for csc_bincore compiler override"
+
+module(
+    name = "e2e_csc_override",
+    version = "0.0.0",
+    compatibility_level = 1,
+)
+
+bazel_dep(name = "rules_dotnet", version = "0.0.0")
+local_path_override(
+    module_name = "rules_dotnet",
+    path = "../..",
+)
+
+# Download the Microsoft.Net.Compilers.Toolset NuGet package
+roslyn = use_extension("//:roslyn.bzl", "roslyn")
+use_repo(roslyn, "roslyn_compiler")
+
+# Register the dotnet toolchain with the custom compiler override
+dotnet = use_extension("@rules_dotnet//dotnet:extensions.bzl", "dotnet")
+dotnet.toolchain(
+    dotnet_version = "11.0.100-preview.3.26207.106",
+    csc_bincore = "@roslyn_compiler//tasks/netcore/bincore",
+)
+use_repo(dotnet, "dotnet_toolchains")
+
+register_toolchains("@dotnet_toolchains//:all")

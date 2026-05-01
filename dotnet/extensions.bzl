@@ -12,6 +12,11 @@ _ATTRS = {
     "dotnet_version": attr.string(
         doc = "Version of the .Net SDK",
     ),
+    "csc_bincore": attr.label(
+        doc = "Label pointing to a target (e.g. filegroup) in the package whose directory " +
+              "contains the bincore compiler files. The package directory itself is used as " +
+              "the bincore override (e.g. @roslyn//tasks/netcore/bincore).",
+    ),
 }
 
 def _toolchain_extension(module_ctx):
@@ -23,20 +28,24 @@ def _toolchain_extension(module_ctx):
                     # Prioritize the root-most registration of the default dotnet toolchain version and
                     # ignore any further registrations (modules are processed breadth-first)
                     continue
-                if toolchain.dotnet_version == registrations[toolchain.name]:
+                if toolchain.dotnet_version == registrations[toolchain.name].dotnet_version:
                     # No problem to register a matching toolchain twice
                     continue
                 fail("Multiple conflicting toolchains declared for name {} ({} and {})".format(
                     toolchain.name,
                     toolchain.dotnet_version,
-                    registrations[toolchain.name],
+                    registrations[toolchain.name].dotnet_version,
                 ))
             else:
-                registrations[toolchain.name] = toolchain.dotnet_version
-    for name, dotnet_version in registrations.items():
+                registrations[toolchain.name] = struct(
+                    dotnet_version = toolchain.dotnet_version,
+                    csc_bincore = toolchain.csc_bincore or None,
+                )
+    for name, reg in registrations.items():
         dotnet_register_toolchains(
             name = name,
-            dotnet_version = dotnet_version,
+            dotnet_version = reg.dotnet_version,
+            csc_bincore = reg.csc_bincore,
             register = False,
         )
 

@@ -12,6 +12,12 @@ _DOC = "Fetch external tools needed for dotnet toolchain"
 _ATTRS = {
     "dotnet_version": attr.string(mandatory = True, values = TOOL_VERSIONS.keys()),
     "platform": attr.string(mandatory = True, values = PLATFORMS.keys()),
+    "csc_bincore": attr.label(
+        doc = "Label pointing to a target (e.g. filegroup) in the package whose directory " +
+              "contains the bincore compiler files. The package directory itself is used as " +
+              "the bincore override (e.g. @roslyn//tasks/netcore/bincore).",
+        mandatory = False,
+    ),
 }
 
 def _dotnet_repo_impl(repository_ctx):
@@ -21,9 +27,17 @@ def _dotnet_repo_impl(repository_ctx):
         integrity = TOOL_VERSIONS[repository_ctx.attr.dotnet_version][repository_ctx.attr.platform]["hash"],
     )
 
-    csc_bincore = repository_ctx.os.environ.get("RULES_DOTNET_CSC_BINCORE", "")
+    csc_bincore = repository_ctx.attr.csc_bincore
     if csc_bincore:
-        repository_ctx.symlink(repository_ctx.path(csc_bincore), "compiler_override/bincore")
+        # Resolve the package directory by locating BUILD.bazel in the same package.
+        ws = csc_bincore.workspace_name
+        pkg = csc_bincore.package
+        if pkg:
+            build_label = Label("@@{}//{}:BUILD.bazel".format(ws, pkg))
+        else:
+            build_label = Label("@@{}:BUILD.bazel".format(ws))
+        bincore_dir = repository_ctx.path(build_label).dirname
+        repository_ctx.symlink(bincore_dir, "compiler_override/bincore")
         csc_binary = "compiler_override/bincore/csc.dll"
         csc_data_glob = "compiler_override/bincore/**/*"
     else:
@@ -126,11 +140,10 @@ dotnet_repositories = repository_rule(
     _dotnet_repo_impl,
     doc = _DOC,
     attrs = _ATTRS,
-    environ = ["RULES_DOTNET_CSC_BINCORE"],
 )
 
 # Wrapper macro around everything above, this is the primary API
-def dotnet_register_toolchains(name, dotnet_version, register = True, **kwargs):
+def dotnet_register_toolchains(name, dotnet_version, register = True, csc_bincore = None, **kwargs):
     """Convenience macro for users which does typical setup.
 
     - create a repository for each built-in platform like "dotnet_linux_amd64" -
@@ -144,6 +157,9 @@ def dotnet_register_toolchains(name, dotnet_version, register = True, **kwargs):
         dotnet_version: The .Net SDK version to use e.g. 8.0.100
         register: whether to call through to native.register_toolchains.
             Should be True for WORKSPACE users, but false when used under bzlmod extension
+        csc_bincore: Optional Label pointing to a target (e.g. filegroup) in the
+            package whose directory contains the bincore compiler files. The
+            package directory itself is used as the bincore override.
         **kwargs: passed to each dotnet_repositories call
     """
     for platform in PLATFORMS.keys():
@@ -151,6 +167,7 @@ def dotnet_register_toolchains(name, dotnet_version, register = True, **kwargs):
             name = name + "_" + platform,
             platform = platform,
             dotnet_version = dotnet_version,
+            csc_bincore = csc_bincore,
             **kwargs
         )
         if register:
