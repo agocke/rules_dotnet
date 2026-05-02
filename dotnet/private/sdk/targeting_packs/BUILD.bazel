@@ -1,4 +1,5 @@
 load("@bazel_lib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load(":targeting_pack.bzl", "targeting_pack")
 load(":targeting_packs.bzl", "targeting_packs")
 
@@ -7,6 +8,17 @@ targeting_packs()
 label_setting(
     name = "targeting_pack",
     build_setting_default = ":empty_pack",
+    visibility = ["//visibility:public"],
+)
+
+# Allows downstream modules (e.g. the .NET VMR) to substitute a custom targeting
+# pack for project_sdk=default / target_framework=net10.0, overriding the SDK
+# pack that targeting_pack_lookup_table.bzl would normally select. The value is
+# the absolute label of a target that produces DotnetTargetingPackInfo. An empty
+# string (the default) means "use the lookup table".
+string_flag(
+    name = "default_net10_0_pack_override",
+    build_setting_default = "",
     visibility = ["//visibility:public"],
 )
 
