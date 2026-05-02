@@ -63,3 +63,41 @@ let usesSeparateNativeAotRuntime (channelVersion: string) =
     match System.Int32.TryParse(channelVersion.Split('.').[0]) with
     | true, major -> major >= 9
     | _ -> false
+
+/// Representative NuGet packages to probe per channel.
+/// If any of these don't exist at the advertised version, the channel is skipped.
+let private probePackages =
+    [ "Microsoft.NETCore.App.Runtime.linux-x64"       // runtime pack
+      "Microsoft.NETCore.App.Host.linux-x64"          // apphost pack
+      "Microsoft.NETCore.App.Ref"                     // targeting pack
+      "runtime.linux-x64.Microsoft.DotNet.ILCompiler" // NativeAOT ILCompiler
+    ]
+
+/// Checks whether a specific package+version exists on NuGet using the flat container API.
+let private nugetPackageExists (client: HttpClient) (packageId: string) (version: string) =
+    let url =
+        $"https://api.nuget.org/v3-flatcontainer/{packageId.ToLower()}/{version.ToLower()}/{packageId.ToLower()}.{version.ToLower()}.nupkg"
+
+    try
+        let request = new HttpRequestMessage(HttpMethod.Head, url)
+        let response = client.SendAsync(request).Result
+        response.IsSuccessStatusCode
+    with _ ->
+        false
+
+/// Verifies that representative NuGet packages exist for a channel's latest-runtime version.
+/// Fails with an error if any probe package is missing.
+let verifyChannelPackages (client: HttpClient) (channel: ChannelInfo) =
+    let missing =
+        probePackages
+        |> List.filter (fun pkg -> not (nugetPackageExists client pkg channel.latestRuntime))
+
+    if not missing.IsEmpty then
+        eprintfn $"ERROR: Channel {channelToTfm channel.channelVersion} ({channel.latestRuntime}) — packages not found on NuGet:"
+
+        for pkg in missing do
+            eprintfn $"  - {pkg}"
+
+        failwith (
+            $"NuGet packages for {channelToTfm channel.channelVersion} {channel.latestRuntime} are not published yet. "
+            + "The releases-index.json may be ahead of NuGet. Investigate and retry.")

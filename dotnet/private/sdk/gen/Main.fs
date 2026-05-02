@@ -19,6 +19,16 @@ let main argv =
     for channel in channels do
         printfn $"  {ReleasesIndex.channelToTfm channel.channelVersion}: {channel.latestRuntime} ({channel.supportPhase})"
 
+    // Verify that NuGet packages exist for each channel's version
+    printfn "Verifying NuGet package availability..."
+    use httpClient = new System.Net.Http.HttpClient()
+
+    for channel in channels do
+        printfn $"  Checking {ReleasesIndex.channelToTfm channel.channelVersion} ({channel.latestRuntime})..."
+        ReleasesIndex.verifyChannelPackages httpClient channel
+
+    printfn "All channels verified."
+
     // Generate the targeting pack targets
     let targetingPacksFile = Path.Combine(sdkFolder, "gen", "targeting-packs.json")
     TargetingPacks.updateTargetingPacks targetingPacksFile channels
