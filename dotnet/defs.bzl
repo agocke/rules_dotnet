@@ -57,6 +57,10 @@ load(
     "//dotnet/private/rules/publish_binary:publish_binary.bzl",
     _publish_binary = "publish_binary",
 )
+load(
+    "//dotnet/private/sdk/targeting_packs:targeting_pack.bzl",
+    _targeting_pack = "targeting_pack",
+)
 
 _SHARED_COMPILATION_WORKER = "//dotnet/private/tools/compiler_worker"
 
@@ -93,3 +97,4 @@ import_dll = _import_dll
 nuget_repo = _nuget_repo
 nuget_archive = _nuget_archive
 dotnet_tool = _dotnet_tool
+targeting_pack = _targeting_pack
