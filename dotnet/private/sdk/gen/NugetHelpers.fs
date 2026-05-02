@@ -88,7 +88,8 @@ let tfms =
       "net7.0"
       "net8.0"
       "net9.0"
-      "net10.0" ]
+      "net10.0"
+      "net11.0" ]
     |> Seq.map (fun f -> NuGetFramework.Parse(f))
 
 let getAllVersions packageId =

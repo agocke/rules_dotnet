@@ -41,6 +41,20 @@ let main argv =
 
     RuntimePacks.generateRuntimePacksNugetRepo runtimePacksFile (Path.Combine(sdkFolder, "runtime_packs"))
 
+    // Generate the NativeAOT pack targets
+    let nativeAotPacksFile = Path.Combine(sdkFolder, "gen", "nativeaot-packs.json")
+    NativeAotPacks.updateNativeAotPacks nativeAotPacksFile
+
+    NativeAotPacks.writeNativeAotPackLookupTable
+        nativeAotPacksFile
+        (Path.Combine(sdkFolder, "nativeaot_packs", "nativeaot_pack_lookup_table.bzl"))
+
+    NativeAotPacks.generateNativeAotPackTargets
+        nativeAotPacksFile
+        (Path.Combine(sdkFolder, "nativeaot_packs", "nativeaot_packs.bzl"))
+
+    NativeAotPacks.generateNativeAotPacksNugetRepo nativeAotPacksFile (Path.Combine(sdkFolder, "nativeaot_packs"))
+
     // Generate the apphost pack targets
     let apphostPacksFile = Path.Combine(sdkFolder, "gen", "apphost-packs.json")
     ApphostPacks.updateApphostPacks apphostPacksFile

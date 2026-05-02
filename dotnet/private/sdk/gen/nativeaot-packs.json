@@ -1,0 +1,174 @@
+{
+  "net8.0": {
+    "linux-x64": {
+      "ilcompiler_id": "runtime.linux-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "linux-arm64": {
+      "ilcompiler_id": "runtime.linux-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "linux-musl-x64": {
+      "ilcompiler_id": "runtime.linux-musl-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "linux-musl-arm64": {
+      "ilcompiler_id": "runtime.linux-musl-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "osx-x64": {
+      "ilcompiler_id": "runtime.osx-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "osx-arm64": {
+      "ilcompiler_id": "runtime.osx-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "win-x64": {
+      "ilcompiler_id": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    },
+    "win-arm64": {
+      "ilcompiler_id": "runtime.win-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "8.0.22"
+    }
+  },
+  "net9.0": {
+    "linux-x64": {
+      "ilcompiler_id": "runtime.linux-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
+      "runtime_version": "9.0.11"
+    },
+    "linux-arm64": {
+      "ilcompiler_id": "runtime.linux-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-arm64",
+      "runtime_version": "9.0.11"
+    },
+    "linux-musl-x64": {
+      "ilcompiler_id": "runtime.linux-musl-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-musl-x64",
+      "runtime_version": "9.0.11"
+    },
+    "linux-musl-arm64": {
+      "ilcompiler_id": "runtime.linux-musl-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-musl-arm64",
+      "runtime_version": "9.0.11"
+    },
+    "osx-x64": {
+      "ilcompiler_id": "runtime.osx-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-x64",
+      "runtime_version": "9.0.11"
+    },
+    "osx-arm64": {
+      "ilcompiler_id": "runtime.osx-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-arm64",
+      "runtime_version": "9.0.11"
+    },
+    "win-x64": {
+      "ilcompiler_id": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
+      "runtime_version": "9.0.11"
+    },
+    "win-arm64": {
+      "ilcompiler_id": "runtime.win-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "9.0.11",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-arm64",
+      "runtime_version": "9.0.11"
+    }
+  },
+  "net10.0": {
+    "linux-x64": {
+      "ilcompiler_id": "runtime.linux-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
+      "runtime_version": "10.0.0"
+    },
+    "linux-arm64": {
+      "ilcompiler_id": "runtime.linux-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-arm64",
+      "runtime_version": "10.0.0"
+    },
+    "linux-musl-x64": {
+      "ilcompiler_id": "runtime.linux-musl-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-musl-x64",
+      "runtime_version": "10.0.0"
+    },
+    "linux-musl-arm64": {
+      "ilcompiler_id": "runtime.linux-musl-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-musl-arm64",
+      "runtime_version": "10.0.0"
+    },
+    "osx-x64": {
+      "ilcompiler_id": "runtime.osx-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-x64",
+      "runtime_version": "10.0.0"
+    },
+    "osx-arm64": {
+      "ilcompiler_id": "runtime.osx-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-arm64",
+      "runtime_version": "10.0.0"
+    },
+    "win-x64": {
+      "ilcompiler_id": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
+      "runtime_version": "10.0.0"
+    },
+    "win-arm64": {
+      "ilcompiler_id": "runtime.win-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "10.0.0",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-arm64",
+      "runtime_version": "10.0.0"
+    }
+  },
+  "net11.0": {
+    "linux-x64": {
+      "ilcompiler_id": "runtime.linux-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-x64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    },
+    "linux-arm64": {
+      "ilcompiler_id": "runtime.linux-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.linux-arm64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    },
+    "osx-x64": {
+      "ilcompiler_id": "runtime.osx-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-x64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    },
+    "osx-arm64": {
+      "ilcompiler_id": "runtime.osx-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.osx-arm64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    },
+    "win-x64": {
+      "ilcompiler_id": "runtime.win-x64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-x64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    },
+    "win-arm64": {
+      "ilcompiler_id": "runtime.win-arm64.Microsoft.DotNet.ILCompiler",
+      "ilcompiler_version": "11.0.0-preview.3.26207.106",
+      "runtime_id": "Microsoft.NETCore.App.Runtime.NativeAOT.win-arm64",
+      "runtime_version": "11.0.0-preview.3.26207.106"
+    }
+  }
+}
