@@ -12,10 +12,16 @@ let main argv =
     // // Generate the RID graph
     Sdk.generateRids (Path.Combine(sdkFolder, "rids.bzl"))
 
+    // Fetch active channels from releases-index.json
+    printfn "Fetching releases-index.json..."
+    let channels = ReleasesIndex.fetchActiveChannels ()
+
+    for channel in channels do
+        printfn $"  {ReleasesIndex.channelToTfm channel.channelVersion}: {channel.latestRuntime} ({channel.supportPhase})"
 
     // Generate the targeting pack targets
     let targetingPacksFile = Path.Combine(sdkFolder, "gen", "targeting-packs.json")
-    TargetingPacks.updateTargetingPacks targetingPacksFile
+    TargetingPacks.updateTargetingPacks targetingPacksFile channels
 
     TargetingPacks.writeTargetingPackLookupTable
         targetingPacksFile
@@ -29,7 +35,7 @@ let main argv =
 
     // Generate the runtime pack targets
     let runtimePacksFile = Path.Combine(sdkFolder, "gen", "runtime-packs.json")
-    RuntimePacks.updateRuntimePacks runtimePacksFile
+    RuntimePacks.updateRuntimePacks runtimePacksFile channels
 
     RuntimePacks.writeRuntimePackLookupTable
         runtimePacksFile
@@ -43,7 +49,7 @@ let main argv =
 
     // Generate the NativeAOT pack targets
     let nativeAotPacksFile = Path.Combine(sdkFolder, "gen", "nativeaot-packs.json")
-    NativeAotPacks.updateNativeAotPacks nativeAotPacksFile
+    NativeAotPacks.updateNativeAotPacks nativeAotPacksFile channels
 
     NativeAotPacks.writeNativeAotPackLookupTable
         nativeAotPacksFile
@@ -57,7 +63,7 @@ let main argv =
 
     // Generate the apphost pack targets
     let apphostPacksFile = Path.Combine(sdkFolder, "gen", "apphost-packs.json")
-    ApphostPacks.updateApphostPacks apphostPacksFile
+    ApphostPacks.updateApphostPacks apphostPacksFile channels
 
     ApphostPacks.writeApphostPackLookupTable
         apphostPacksFile

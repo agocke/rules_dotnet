@@ -10,11 +10,17 @@ type TargetingPack = { id: string; version: string }
 let private targetingPackLabel projectSdk tfm =
     $"//dotnet/private/sdk/targeting_packs:{projectSdk}_{tfm}"
 
-let updateTargetingPacks targetingPacksFile =
+let updateTargetingPacks targetingPacksFile (channels: ReleasesIndex.ChannelInfo list) =
     let targetingPacks = File.ReadAllText targetingPacksFile
 
     let targetingPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, TargetingPack[]>>>(targetingPacks)
+
+    // Build a map from TFM to latest version from releases-index
+    let channelVersions =
+        channels
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> Map.ofList
 
     let updatedTargetingPacks =
         Dictionary<string, Dictionary<string, TargetingPack[]>>()
@@ -23,24 +29,39 @@ let updateTargetingPacks targetingPacksFile =
         let updatedtfmPacks = Dictionary<string, TargetingPack[]>()
 
         for tfmPacks in sdk.Value do
-            let mutable updatedPacks: TargetingPack[] = Array.empty
+            match channelVersions.TryFind tfmPacks.Key with
+            | Some latestVersion ->
+                // Active channel — update all pack versions
+                let updatedPacks =
+                    tfmPacks.Value
+                    |> Array.map (fun pack -> { pack with version = latestVersion })
+                    |> Array.sortBy (fun p -> p.id)
 
-            for pack in tfmPacks.Value do
-                let majorVersion = pack.version.Split('.')[0]
-                let featureVersion = pack.version.Split('.')[1]
+                updatedtfmPacks.Add(tfmPacks.Key, updatedPacks)
+            | None ->
+                // Old/EOL channel — keep unchanged
+                updatedtfmPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-                let latestVersion =
-                    NugetHelpers.getAllVersions pack.id
-                    |> List.filter (fun v -> v.ToFullString().StartsWith($"{majorVersion}.{featureVersion}"))
-                    |> List.max
+        // Auto-add new TFMs from releases-index that aren't in JSON yet
+        for channel in channels do
+            let tfm = ReleasesIndex.channelToTfm channel.channelVersion
 
-                let updatedPack =
-                    { pack with
-                        version = latestVersion.ToFullString() }
+            if not (updatedtfmPacks.ContainsKey tfm) then
+                // Template from the highest existing TFM
+                let templateTfm =
+                    updatedtfmPacks.Keys
+                    |> Seq.filter (fun k -> k.StartsWith "net" && not (k.Contains "standard") && not (k.Contains "coreapp"))
+                    |> Seq.sortDescending
+                    |> Seq.tryHead
 
-                updatedPacks <- Array.append updatedPacks [| updatedPack |]
+                match templateTfm with
+                | Some template ->
+                    let packs =
+                        updatedtfmPacks.[template]
+                        |> Array.map (fun p -> { p with version = channel.latestRuntime })
 
-            updatedtfmPacks.Add(tfmPacks.Key, updatedPacks |> Array.sortBy (fun p -> p.id))
+                    updatedtfmPacks.Add(tfm, packs)
+                | None -> ()
 
         updatedTargetingPacks.Add(sdk.Key, updatedtfmPacks)
 

@@ -11,13 +11,19 @@ type RuntimePack = { id: string; version: string }
 let private runtimePackLabel projectSdk tfm rid =
     $"//dotnet/private/sdk/runtime_packs:{projectSdk}_{tfm}_{rid}"
 
-let updateRuntimePacks runtimePacksFile =
+let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ChannelInfo list) =
     let runtimePacks = File.ReadAllText runtimePacksFile
 
     let runtimePacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, Dictionary<string, RuntimePack[]>>>>(
             runtimePacks
         )
+
+    // Build a map from TFM to latest version from releases-index
+    let channelVersions =
+        channels
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> Map.ofList
 
     let updatedRuntimePacks =
         Dictionary<string, Dictionary<string, Dictionary<string, RuntimePack[]>>>()
@@ -26,29 +32,49 @@ let updateRuntimePacks runtimePacksFile =
         let updatedtfmPacks = Dictionary<string, Dictionary<string, RuntimePack[]>>()
 
         for tfmPacks in sdk.Value do
-            let updatedRidPacks = Dictionary<string, RuntimePack[]>()
+            match channelVersions.TryFind tfmPacks.Key with
+            | Some latestVersion ->
+                // Active channel — update all pack versions
+                let updatedRidPacks = Dictionary<string, RuntimePack[]>()
 
-            for ridPacks in tfmPacks.Value do
-                let mutable updatedPacks: RuntimePack[] = Array.empty
+                for ridPacks in tfmPacks.Value do
+                    let updatedPacks =
+                        ridPacks.Value
+                        |> Array.map (fun pack -> { pack with version = latestVersion })
+                        |> Array.sortBy (fun p -> p.id)
 
-                for pack in ridPacks.Value do
-                    let majorVersion = pack.version.Split('.')[0]
-                    let featureVersion = pack.version.Split('.')[1]
+                    updatedRidPacks.Add(ridPacks.Key, updatedPacks)
 
-                    let latestVersion =
-                        NugetHelpers.getAllVersions pack.id
-                        |> List.filter (fun v -> v.ToFullString().StartsWith($"{majorVersion}.{featureVersion}"))
-                        |> List.max
+                updatedtfmPacks.Add(tfmPacks.Key, updatedRidPacks)
+            | None ->
+                // Old/EOL channel — keep unchanged
+                updatedtfmPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-                    let updatedPack =
-                        { pack with
-                            version = latestVersion.ToFullString() }
+        // Auto-add new TFMs from releases-index that aren't in JSON yet
+        for channel in channels do
+            let tfm = ReleasesIndex.channelToTfm channel.channelVersion
 
-                    updatedPacks <- Array.append updatedPacks [| updatedPack |]
+            if not (updatedtfmPacks.ContainsKey tfm) then
+                // Template from the highest existing TFM
+                let templateTfm =
+                    updatedtfmPacks.Keys
+                    |> Seq.filter (fun k -> k.StartsWith "net" && not (k.Contains "standard") && not (k.Contains "coreapp"))
+                    |> Seq.sortDescending
+                    |> Seq.tryHead
 
-                updatedRidPacks.Add(ridPacks.Key, updatedPacks |> Array.sortBy (fun p -> p.id))
+                match templateTfm with
+                | Some template ->
+                    let ridPacks = Dictionary<string, RuntimePack[]>()
 
-            updatedtfmPacks.Add(tfmPacks.Key, updatedRidPacks)
+                    for ridEntry in updatedtfmPacks.[template] do
+                        let packs =
+                            ridEntry.Value
+                            |> Array.map (fun p -> { p with version = channel.latestRuntime })
+
+                        ridPacks.Add(ridEntry.Key, packs)
+
+                    updatedtfmPacks.Add(tfm, ridPacks)
+                | None -> ()
 
         updatedRuntimePacks.Add(sdk.Key, updatedtfmPacks)
 

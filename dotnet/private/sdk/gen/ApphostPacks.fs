@@ -11,34 +11,52 @@ type ApphostPack = { id: string; version: string }
 let private apphostPackLabel tfm rid =
     $"//dotnet/private/sdk/apphost_packs:{tfm}_{rid}"
 
-let updateApphostPacks apphostPacksFile =
+let updateApphostPacks apphostPacksFile (channels: ReleasesIndex.ChannelInfo list) =
     let apphostPacks = File.ReadAllText apphostPacksFile
 
     let apphostPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, ApphostPack>>>(apphostPacks)
 
+    // Build a map from TFM to latest version from releases-index
+    let channelVersions =
+        channels
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> Map.ofList
+
     let updatedApphostPacks = Dictionary<string, Dictionary<string, ApphostPack>>()
 
+    // Keep existing entries, updating versions for active channels
     for tfmPacks in apphostPacks do
-        let updatedtfmPacks = Dictionary<string, ApphostPack>()
+        match channelVersions.TryFind tfmPacks.Key with
+        | Some latestVersion ->
+            let ridPacks = Dictionary<string, ApphostPack>()
 
-        for ridPacks in tfmPacks.Value do
-            let pack = ridPacks.Value
-            let majorVersion = pack.version.Split('.')[0]
-            let featureVersion = pack.version.Split('.')[1]
+            for ridEntry in tfmPacks.Value do
+                ridPacks.Add(
+                    ridEntry.Key,
+                    { ridEntry.Value with version = latestVersion }
+                )
 
-            let latestVersion =
-                NugetHelpers.getAllVersions pack.id
-                |> List.filter (fun v -> v.ToFullString().StartsWith($"{majorVersion}.{featureVersion}"))
-                |> List.max
+            updatedApphostPacks.Add(tfmPacks.Key, ridPacks)
+        | None ->
+            // Old/EOL channel — keep unchanged
+            updatedApphostPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-            let updatedPack =
-                { pack with
-                    version = latestVersion.ToFullString() }
+    // Auto-add new TFMs from releases-index that aren't in JSON yet
+    for channel in channels do
+        let tfm = ReleasesIndex.channelToTfm channel.channelVersion
 
-            updatedtfmPacks.Add(ridPacks.Key, updatedPack)
+        if not (updatedApphostPacks.ContainsKey tfm) then
+            let ridPacks = Dictionary<string, ApphostPack>()
 
-        updatedApphostPacks.Add(tfmPacks.Key, updatedtfmPacks)
+            for rid in ReleasesIndex.standardRids do
+                ridPacks.Add(
+                    rid,
+                    { id = $"Microsoft.NETCore.App.Host.{rid}"
+                      version = channel.latestRuntime }
+                )
+
+            updatedApphostPacks.Add(tfm, ridPacks)
 
     let updatedApphostPacksJson =
         JsonSerializer.Serialize(updatedApphostPacks, options = JsonSerializerOptions(WriteIndented = true))

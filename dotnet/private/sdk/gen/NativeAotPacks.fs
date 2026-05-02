@@ -17,44 +17,74 @@ type NativeAotPack =
 let private nativeaotPackLabel tfm rid =
     $"//dotnet/private/sdk/nativeaot_packs:{tfm}_{rid}"
 
-let updateNativeAotPacks nativeAotPacksFile =
+let updateNativeAotPacks nativeAotPacksFile (channels: ReleasesIndex.ChannelInfo list) =
     let nativeAotPacks = File.ReadAllText nativeAotPacksFile
 
     let nativeAotPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, NativeAotPack>>>(nativeAotPacks)
 
+    // Build a map from TFM to channel info
+    let channelMap =
+        channels
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c))
+        |> Map.ofList
+
     let updatedNativeAotPacks = Dictionary<string, Dictionary<string, NativeAotPack>>()
 
+    // Keep existing entries, updating versions for active channels
     for tfmPacks in nativeAotPacks do
-        let updatedRidPacks = Dictionary<string, NativeAotPack>()
+        match channelMap.TryFind tfmPacks.Key with
+        | Some channel ->
+            let version = channel.latestRuntime
+            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime channel.channelVersion
+            let ridPacks = Dictionary<string, NativeAotPack>()
 
-        for ridPacks in tfmPacks.Value do
-            let pack = ridPacks.Value
-            let majorVersion = pack.ilcompiler_version.Split('.')[0]
-            let featureVersion = pack.ilcompiler_version.Split('.')[1]
+            for ridEntry in tfmPacks.Value do
+                let rid = ridEntry.Key
+                let pack =
+                    if hasSeparateRuntime then
+                        { ilcompiler_id = $"runtime.{rid}.Microsoft.DotNet.ILCompiler"
+                          ilcompiler_version = version
+                          runtime_id = $"Microsoft.NETCore.App.Runtime.NativeAOT.{rid}"
+                          runtime_version = version }
+                    else
+                        { ilcompiler_id = $"runtime.{rid}.Microsoft.DotNet.ILCompiler"
+                          ilcompiler_version = version
+                          runtime_id = null
+                          runtime_version = null }
 
-            let latestIlcVersion =
-                NugetHelpers.getAllVersions pack.ilcompiler_id
-                |> List.filter (fun v -> v.ToFullString().StartsWith($"{majorVersion}.{featureVersion}"))
-                |> List.max
+                ridPacks.Add(rid, pack)
 
-            let updatedPack =
-                if pack.runtime_id <> null then
-                    let latestRuntimeVersion =
-                        NugetHelpers.getAllVersions pack.runtime_id
-                        |> List.filter (fun v -> v.ToFullString().StartsWith($"{majorVersion}.{featureVersion}"))
-                        |> List.max
+            updatedNativeAotPacks.Add(tfmPacks.Key, ridPacks)
+        | None ->
+            // Old/EOL channel — keep unchanged
+            updatedNativeAotPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-                    { pack with
-                        ilcompiler_version = latestIlcVersion.ToFullString()
-                        runtime_version = latestRuntimeVersion.ToFullString() }
-                else
-                    { pack with
-                        ilcompiler_version = latestIlcVersion.ToFullString() }
+    // Auto-add new TFMs from releases-index that aren't in JSON yet
+    for channel in channels do
+        let tfm = ReleasesIndex.channelToTfm channel.channelVersion
 
-            updatedRidPacks.Add(ridPacks.Key, updatedPack)
+        if not (updatedNativeAotPacks.ContainsKey tfm) then
+            let version = channel.latestRuntime
+            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime channel.channelVersion
+            let ridPacks = Dictionary<string, NativeAotPack>()
 
-        updatedNativeAotPacks.Add(tfmPacks.Key, updatedRidPacks)
+            for rid in ReleasesIndex.nativeAotRids do
+                let pack =
+                    if hasSeparateRuntime then
+                        { ilcompiler_id = $"runtime.{rid}.Microsoft.DotNet.ILCompiler"
+                          ilcompiler_version = version
+                          runtime_id = $"Microsoft.NETCore.App.Runtime.NativeAOT.{rid}"
+                          runtime_version = version }
+                    else
+                        { ilcompiler_id = $"runtime.{rid}.Microsoft.DotNet.ILCompiler"
+                          ilcompiler_version = version
+                          runtime_id = null
+                          runtime_version = null }
+
+                ridPacks.Add(rid, pack)
+
+            updatedNativeAotPacks.Add(tfm, ridPacks)
 
     let updatedJson =
         JsonSerializer.Serialize(updatedNativeAotPacks, options = JsonSerializerOptions(WriteIndented = true))
