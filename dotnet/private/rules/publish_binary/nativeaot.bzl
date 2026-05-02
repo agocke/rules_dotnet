@@ -35,6 +35,14 @@ NATIVEAOT_FEATURE_SWITCHES = {
     "System.Runtime.InteropServices.BuiltInComInterop.IsSupported": "false",
 }
 
+def _collect_ilc_arg_overrides(args, prefix):
+    overrides = {}
+    for arg in args:
+        if arg.startswith(prefix):
+            key = arg.removeprefix(prefix).split("=", 1)[0]
+            overrides[key] = True
+    return overrides
+
 def _select_runtime_libs(runtime_libs, server_gc = False, eventpipe = False):
     """Select the correct subset of runtime libs matching MSBuild NativeAOT targets.
     
@@ -89,7 +97,11 @@ def _add_unix_link_args(link_args, obj_file, output_exe, nativeaot_pack, target_
 
     # Runtime libs from the pack — select correct variants
     # The obj file must be inside the group for circular reference resolution
-    selected_libs = _select_runtime_libs(nativeaot_pack.runtime_libs)
+    selected_libs = _select_runtime_libs(
+        nativeaot_pack.runtime_libs,
+        server_gc = ctx.attr.server_gc,
+        eventpipe = ctx.attr.eventpipe,
+    )
     if not is_apple:
         link_args.add("-Wl,--start-group")
     link_args.add(obj_file)
@@ -174,7 +186,11 @@ def _add_windows_link_args(link_args, obj_file, output_exe, nativeaot_pack, targ
     link_args.add("/OUT:" + output_exe.path)
     link_args.add(obj_file)
 
-    for lib in nativeaot_pack.runtime_libs:
+    for lib in _select_runtime_libs(
+        nativeaot_pack.runtime_libs,
+        server_gc = ctx.attr.server_gc,
+        eventpipe = ctx.attr.eventpipe,
+    ):
         link_args.add(lib)
 
     # System import libraries
@@ -224,6 +240,7 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
     target_os = get_target_os(ctx)
     target_arch = get_target_arch(ctx)
     main_dll = binary_info.dll
+    runtime_identifier = ctx.attr.runtime_identifier if ctx.attr.runtime_identifier else binary_info.runtime_pack_info.runtime_identifier
 
     # Collect all runtime dependency DLLs
     dep_libs = []
@@ -259,17 +276,23 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
     if ctx.attr.debug_symbols:
         rsp_lines.append("-g")
 
+    export_file = None
+    if target_os == "linux":
+        export_file = ctx.actions.declare_file(ctx.label.name + ".exports")
+        rsp_lines.append("--exportsfile:" + export_file.path)
+        rsp_lines.append("--export-dynamic-symbol:DotNetRuntimeDebugHeader")
+
     # Sensible defaults matching MSBuild
     rsp_lines.append("--systemmodule:System.Private.CoreLib")
     rsp_lines.append("--dehydrate")
     rsp_lines.append("--scanreflection")
-    rsp_lines.append("--methodbodyfolding")
-    rsp_lines.append("all")
-    rsp_lines.append("--stacktracedata")
+    rsp_lines.append("--methodbodyfolding:generic")
+    rsp_lines.append("--stacktracedata:lines")
     rsp_lines.append("--resilient")
+    rsp_lines.append("--feature:System.Diagnostics.Debugger.IsSupported=false")
 
     # Generate native exports (InitializeModules, ProcessFinalizers, etc.)
-    rsp_lines.append("--generateunmanagedentrypoints:System.Private.CoreLib")
+    rsp_lines.append("--generateunmanagedentrypoints:System.Private.CoreLib,HIDDEN")
 
     # Init assemblies — required for ILC to generate module initialization code
     rsp_lines.append("--initassembly:System.Private.CoreLib")
@@ -278,24 +301,33 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
     rsp_lines.append("--initassembly:System.Private.Reflection.Execution")
 
     # Direct P/Invoke for system native libraries (avoids dlopen)
-    # Include both with and without "lib" prefix to match DllImport names
     rsp_lines.append("--directpinvoke:System.Native")
-    rsp_lines.append("--directpinvoke:libSystem.Native")
-    rsp_lines.append("--directpinvoke:System.Globalization.Native")
-    rsp_lines.append("--directpinvoke:libSystem.Globalization.Native")
+    if not ctx.attr.invariant_globalization:
+        rsp_lines.append("--directpinvoke:System.Globalization.Native")
     rsp_lines.append("--directpinvoke:System.IO.Compression.Native")
-    rsp_lines.append("--directpinvoke:libSystem.IO.Compression.Native")
     rsp_lines.append("--directpinvoke:System.Net.Security.Native")
-    rsp_lines.append("--directpinvoke:libSystem.Net.Security.Native")
     rsp_lines.append("--directpinvoke:System.Security.Cryptography.Native.OpenSsl")
-    rsp_lines.append("--directpinvoke:libSystem.Security.Cryptography.Native.OpenSsl")
 
     # Feature switches: the 6 SDK defaults + invariant globalization
+    feature_overrides = _collect_ilc_arg_overrides(ctx.attr.extra_ilc_args, "--feature:")
+    runtimeknob_overrides = _collect_ilc_arg_overrides(ctx.attr.extra_ilc_args, "--runtimeknob:")
+
     for key, value in NATIVEAOT_FEATURE_SWITCHES.items():
-        rsp_lines.append("--feature:%s=%s" % (key, value))
+        if key not in feature_overrides:
+            rsp_lines.append("--feature:%s=%s" % (key, value))
+        if key not in runtimeknob_overrides:
+            rsp_lines.append("--runtimeknob:%s=%s" % (key, value))
 
     if ctx.attr.invariant_globalization:
-        rsp_lines.append("--feature:System.Globalization.Invariant=true")
+        if "System.Globalization.Invariant" not in feature_overrides:
+            rsp_lines.append("--feature:System.Globalization.Invariant=true")
+        if "System.Globalization.Invariant" not in runtimeknob_overrides:
+            rsp_lines.append("--runtimeknob:System.Globalization.Invariant=true")
+
+    rsp_lines.append("--runtimeknob:RUNTIME_IDENTIFIER=%s" % runtime_identifier)
+
+    if ctx.attr.server_gc:
+        rsp_lines.append("--runtimeopt:gcServer=1")
 
     # Extra ILC arguments (escape hatch)
     for arg in ctx.attr.extra_ilc_args:
@@ -308,7 +340,6 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
         nativeaot_pack.mibc_files +
         nativeaot_pack.ilc_files.to_list()
     )
-
     # Write response file
     rsp_file = ctx.actions.declare_file(ctx.label.name + ".ilc.rsp")
     ctx.actions.write(rsp_file, "\n".join(rsp_lines) + "\n")
@@ -328,7 +359,7 @@ def nativeaot_publish(ctx, binary_info, nativeaot_pack):
     ctx.actions.run_shell(
         command = cmd,
         inputs = ilc_inputs,
-        outputs = [obj_file],
+        outputs = [obj_file] + ([export_file] if export_file else []),
         mnemonic = "NativeAotIlc",
         progress_message = "NativeAOT compiling %s" % main_dll.short_path,
     )
@@ -457,6 +488,14 @@ NATIVEAOT_ATTRS = {
     "invariant_globalization": attr.bool(
         doc = "Use invariant globalization (no ICU dependency).",
         default = True,
+    ),
+    "server_gc": attr.bool(
+        doc = "Use the Server GC NativeAOT runtime variant and set gcServer=1.",
+        default = False,
+    ),
+    "eventpipe": attr.bool(
+        doc = "Use the eventpipe-enabled NativeAOT runtime variant.",
+        default = False,
     ),
     "strip_symbols": attr.bool(
         doc = "Strip debug symbols from the output (non-Windows).",
