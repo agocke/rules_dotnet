@@ -17,16 +17,16 @@ type NativeAotPack =
 let private nativeaotPackLabel tfm rid =
     $"//dotnet/private/sdk/nativeaot_packs:{tfm}_{rid}"
 
-let updateNativeAotPacks nativeAotPacksFile (channels: ReleasesIndex.ChannelInfo list) =
+let updateNativeAotPacks nativeAotPacksFile (channels: ReleasesIndex.ResolvedChannel list) =
     let nativeAotPacks = File.ReadAllText nativeAotPacksFile
 
     let nativeAotPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, NativeAotPack>>>(nativeAotPacks)
 
-    // Build a map from TFM to channel info
+    // Build a map from TFM to resolved channel
     let channelMap =
         channels
-        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c))
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channel.channelVersion, c))
         |> Map.ofList
 
     let updatedNativeAotPacks = Dictionary<string, Dictionary<string, NativeAotPack>>()
@@ -34,9 +34,9 @@ let updateNativeAotPacks nativeAotPacksFile (channels: ReleasesIndex.ChannelInfo
     // Keep existing entries, updating versions for active channels
     for tfmPacks in nativeAotPacks do
         match channelMap.TryFind tfmPacks.Key with
-        | Some channel ->
-            let version = channel.latestRuntime
-            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime channel.channelVersion
+        | Some resolved ->
+            let version = resolved.channel.latestRuntime
+            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime resolved.channel.channelVersion
             let ridPacks = Dictionary<string, NativeAotPack>()
 
             for ridEntry in tfmPacks.Value do
@@ -60,13 +60,13 @@ let updateNativeAotPacks nativeAotPacksFile (channels: ReleasesIndex.ChannelInfo
             // Old/EOL channel — keep unchanged
             updatedNativeAotPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-    // Auto-add new TFMs from releases-index that aren't in JSON yet
-    for channel in channels do
-        let tfm = ReleasesIndex.channelToTfm channel.channelVersion
+    // Auto-add new TFMs that aren't in JSON yet
+    for resolved in channels do
+        let tfm = ReleasesIndex.channelToTfm resolved.channel.channelVersion
 
         if not (updatedNativeAotPacks.ContainsKey tfm) then
-            let version = channel.latestRuntime
-            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime channel.channelVersion
+            let version = resolved.channel.latestRuntime
+            let hasSeparateRuntime = ReleasesIndex.usesSeparateNativeAotRuntime resolved.channel.channelVersion
             let ridPacks = Dictionary<string, NativeAotPack>()
 
             for rid in ReleasesIndex.nativeAotRids do
@@ -172,7 +172,7 @@ let generateNativeAotPackTargets nativeAotPacksFile output =
     File.WriteAllText(output, sb.ToString())
     ()
 
-let generateNativeAotPacksNugetRepo nativeAotPacksFile outputFolder =
+let generateNativeAotPacksNugetRepo nativeAotPacksFile outputFolder (versionFeedMap: Map<string, string>) =
     let json = File.ReadAllText nativeAotPacksFile
 
     let nativeAotPacks =
@@ -193,14 +193,15 @@ let generateNativeAotPacksNugetRepo nativeAotPacksFile outputFolder =
         allPackages
         |> Seq.distinctBy (fun struct (id, version) -> $"{id}.{version}")
         |> Seq.map (fun struct (id, version) ->
+            let feed = versionFeedMap.TryFind version |> Option.defaultValue ReleasesIndex.nugetOrgFeed
             let packageInfo =
-                NugetHelpers.getPackageInfo id version NugetHelpers.nugetV3Feed
+                NugetHelpers.getPackageInfo id version feed
 
             { name = $"{id.ToLower()}.v{version}"
               id = id
               version = version
               sha512 = packageInfo.sha512sri
-              sources = [ NugetHelpers.nugetV3Feed ]
+              sources = [ feed ]
               netrc = None
               dependencies = Dictionary<string, string seq>()
               targeting_pack_overrides = packageInfo.overrides
@@ -237,8 +238,9 @@ let generateNativeAotPacksNugetRepo nativeAotPacksFile outputFolder =
     sb.AppendLine() |> ignore
 
     for version in illinkVersions do
+        let feed = versionFeedMap.TryFind version |> Option.defaultValue ReleasesIndex.nugetOrgFeed
         let packageInfo =
-            NugetHelpers.getPackageInfo "microsoft.net.illink.tasks" version NugetHelpers.nugetV3Feed
+            NugetHelpers.getPackageInfo "microsoft.net.illink.tasks" version feed
 
         sb.AppendLine($"    maybe(") |> ignore
         sb.AppendLine($"        nuget_archive,") |> ignore
@@ -246,7 +248,7 @@ let generateNativeAotPacksNugetRepo nativeAotPacksFile outputFolder =
         sb.AppendLine($"        id = \"microsoft.net.illink.tasks\",") |> ignore
         sb.AppendLine($"        version = \"{version}\",") |> ignore
         sb.AppendLine($"        sha512 = \"{packageInfo.sha512sri}\",") |> ignore
-        sb.AppendLine($"        sources = [\"https://api.nuget.org/v3/index.json\"],") |> ignore
+        sb.AppendLine($"        sources = [\"{feed}\"],") |> ignore
         sb.AppendLine($"    )") |> ignore
 
     File.WriteAllText(bzlFile, sb.ToString())

@@ -11,7 +11,7 @@ type RuntimePack = { id: string; version: string }
 let private runtimePackLabel projectSdk tfm rid =
     $"//dotnet/private/sdk/runtime_packs:{projectSdk}_{tfm}_{rid}"
 
-let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ChannelInfo list) =
+let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ResolvedChannel list) =
     let runtimePacks = File.ReadAllText runtimePacksFile
 
     let runtimePacks =
@@ -19,10 +19,10 @@ let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ChannelInfo lis
             runtimePacks
         )
 
-    // Build a map from TFM to latest version from releases-index
+    // Build a map from TFM to latest version from resolved channels
     let channelVersions =
         channels
-        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channel.channelVersion, c.channel.latestRuntime))
         |> Map.ofList
 
     let updatedRuntimePacks =
@@ -50,9 +50,9 @@ let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ChannelInfo lis
                 // Old/EOL channel — keep unchanged
                 updatedtfmPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-        // Auto-add new TFMs from releases-index that aren't in JSON yet
-        for channel in channels do
-            let tfm = ReleasesIndex.channelToTfm channel.channelVersion
+        // Auto-add new TFMs that aren't in JSON yet
+        for resolved in channels do
+            let tfm = ReleasesIndex.channelToTfm resolved.channel.channelVersion
 
             if not (updatedtfmPacks.ContainsKey tfm) then
                 // Template from the highest existing TFM
@@ -69,7 +69,7 @@ let updateRuntimePacks runtimePacksFile (channels: ReleasesIndex.ChannelInfo lis
                     for ridEntry in updatedtfmPacks.[template] do
                         let packs =
                             ridEntry.Value
-                            |> Array.map (fun p -> { p with version = channel.latestRuntime })
+                            |> Array.map (fun p -> { p with version = resolved.channel.latestRuntime })
 
                         ridPacks.Add(ridEntry.Key, packs)
 
@@ -161,7 +161,7 @@ let generateRuntimePackTargets runtimePacksFile output =
 
     ()
 
-let generateRuntimePacksNugetRepo runtimePacksFile outputFolder =
+let generateRuntimePacksNugetRepo runtimePacksFile outputFolder (versionFeedMap: Map<string, string>) =
     let runtimePacksJson = File.ReadAllText runtimePacksFile
 
     let runtimePacks =
@@ -176,14 +176,15 @@ let generateRuntimePacksNugetRepo runtimePacksFile outputFolder =
             |> Seq.collect (fun tfmPacks -> tfmPacks.Value |> Seq.collect (fun ridPacks -> ridPacks.Value)))
         |> Seq.distinctBy (fun p -> $"{p.id}.{p.version}")
         |> Seq.map (fun pack ->
+            let feed = versionFeedMap.TryFind pack.version |> Option.defaultValue ReleasesIndex.nugetOrgFeed
             let packageInfo =
-                NugetHelpers.getPackageInfo pack.id pack.version NugetHelpers.nugetV3Feed
+                NugetHelpers.getPackageInfo pack.id pack.version feed
 
             { name = $"{pack.id.ToLower()}.v{pack.version}"
               id = pack.id
               version = pack.version
               sha512 = packageInfo.sha512sri
-              sources = [ NugetHelpers.nugetV3Feed ]
+              sources = [ feed ]
               netrc = None
               dependencies = Dictionary<string, string seq>()
               targeting_pack_overrides = packageInfo.overrides

@@ -11,16 +11,16 @@ type ApphostPack = { id: string; version: string }
 let private apphostPackLabel tfm rid =
     $"//dotnet/private/sdk/apphost_packs:{tfm}_{rid}"
 
-let updateApphostPacks apphostPacksFile (channels: ReleasesIndex.ChannelInfo list) =
+let updateApphostPacks apphostPacksFile (channels: ReleasesIndex.ResolvedChannel list) =
     let apphostPacks = File.ReadAllText apphostPacksFile
 
     let apphostPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, ApphostPack>>>(apphostPacks)
 
-    // Build a map from TFM to latest version from releases-index
+    // Build a map from TFM to latest version from resolved channels
     let channelVersions =
         channels
-        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channel.channelVersion, c.channel.latestRuntime))
         |> Map.ofList
 
     let updatedApphostPacks = Dictionary<string, Dictionary<string, ApphostPack>>()
@@ -42,9 +42,9 @@ let updateApphostPacks apphostPacksFile (channels: ReleasesIndex.ChannelInfo lis
             // Old/EOL channel — keep unchanged
             updatedApphostPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-    // Auto-add new TFMs from releases-index that aren't in JSON yet
-    for channel in channels do
-        let tfm = ReleasesIndex.channelToTfm channel.channelVersion
+    // Auto-add new TFMs from channels that aren't in JSON yet
+    for resolved in channels do
+        let tfm = ReleasesIndex.channelToTfm resolved.channel.channelVersion
 
         if not (updatedApphostPacks.ContainsKey tfm) then
             let ridPacks = Dictionary<string, ApphostPack>()
@@ -53,7 +53,7 @@ let updateApphostPacks apphostPacksFile (channels: ReleasesIndex.ChannelInfo lis
                 ridPacks.Add(
                     rid,
                     { id = $"Microsoft.NETCore.App.Host.{rid}"
-                      version = channel.latestRuntime }
+                      version = resolved.channel.latestRuntime }
                 )
 
             updatedApphostPacks.Add(tfm, ridPacks)
@@ -130,7 +130,7 @@ let generateApphostPackTargets apphostPacksFile output =
 
     ()
 
-let generateApphostPacksNugetRepo apphostPacksFile outputFolder =
+let generateApphostPacksNugetRepo apphostPacksFile outputFolder (versionFeedMap: Map<string, string>) =
     let apphostPacksJson = File.ReadAllText apphostPacksFile
 
     let apphostPacks =
@@ -141,14 +141,15 @@ let generateApphostPacksNugetRepo apphostPacksFile outputFolder =
         |> Seq.collect (fun sdk -> sdk.Value |> Seq.map (fun tfmPacks -> tfmPacks.Value))
         |> Seq.distinctBy (fun p -> $"{p.id}.{p.version}")
         |> Seq.map (fun pack ->
+            let feed = versionFeedMap.TryFind pack.version |> Option.defaultValue ReleasesIndex.nugetOrgFeed
             let packageInfo =
-                NugetHelpers.getPackageInfo pack.id pack.version NugetHelpers.nugetV3Feed
+                NugetHelpers.getPackageInfo pack.id pack.version feed
 
             { name = $"{pack.id.ToLower()}.v{pack.version}"
               id = pack.id
               version = pack.version
               sha512 = packageInfo.sha512sri
-              sources = [ NugetHelpers.nugetV3Feed ]
+              sources = [ feed ]
               netrc = None
               dependencies = Dictionary<string, string seq>()
               targeting_pack_overrides = packageInfo.overrides

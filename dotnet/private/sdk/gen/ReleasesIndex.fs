@@ -3,7 +3,6 @@ module ReleasesIndex
 open System.Net.Http
 open System.Text.Json
 open System.Text.Json.Serialization
-open System.Collections.Generic
 
 let private releasesIndexUrl =
     "https://raw.githubusercontent.com/dotnet/core/main/release-notes/releases-index.json"
@@ -26,6 +25,19 @@ type ReleasesIndexRoot =
     { [<JsonPropertyName("releases-index")>]
       releasesIndex: ChannelInfo[] }
 
+/// Where the channel's packages come from.
+type ChannelOrigin =
+    | Released
+    | Daily
+
+/// A channel with its resolved package feed and origin.
+type ResolvedChannel =
+    { channel: ChannelInfo
+      feedUrl: string
+      origin: ChannelOrigin }
+
+let nugetOrgFeed = "https://api.nuget.org/v3/index.json"
+
 /// Fetches releases-index.json and returns active channels (>= 8.0, not EOL).
 let fetchActiveChannels () =
     use client = new HttpClient()
@@ -40,6 +52,46 @@ let fetchActiveChannels () =
         | true, major -> major >= 8 && c.supportPhase <> "eol"
         | _ -> false)
     |> Array.toList
+
+/// Wraps released channels with nuget.org feed.
+let resolveReleasedChannels (channels: ChannelInfo list) : ResolvedChannel list =
+    channels
+    |> List.map (fun c ->
+        { channel = c
+          feedUrl = nugetOrgFeed
+          origin = Released })
+
+/// Creates a synthetic ResolvedChannel for a daily build.
+let createDailyChannel (channelVersion: string) (version: string) (feedUrl: string) : ResolvedChannel =
+    { channel =
+        { channelVersion = channelVersion
+          latestRuntime = version
+          latestSdk = ""
+          supportPhase = "daily"
+          releasesJson = "" }
+      feedUrl = feedUrl
+      origin = Daily }
+
+/// Merges daily overrides into resolved channels. Daily channels replace any
+/// released channel with the same channel-version.
+let mergeChannels (released: ResolvedChannel list) (daily: ResolvedChannel list) : ResolvedChannel list =
+    let dailyByVersion =
+        daily |> List.map (fun d -> (d.channel.channelVersion, d)) |> Map.ofList
+
+    let merged =
+        released
+        |> List.map (fun r ->
+            match dailyByVersion.TryFind r.channel.channelVersion with
+            | Some d -> d
+            | None -> r)
+
+    // Add any daily channels that don't exist in released
+    let releasedVersions = released |> List.map (fun r -> r.channel.channelVersion) |> Set.ofList
+
+    let newDaily =
+        daily |> List.filter (fun d -> not (releasedVersions.Contains d.channel.channelVersion))
+
+    merged @ newDaily
 
 /// Converts a channel-version (e.g., "11.0") to a TFM (e.g., "net11.0").
 let channelToTfm (channelVersion: string) = $"net{channelVersion}"
@@ -65,7 +117,6 @@ let usesSeparateNativeAotRuntime (channelVersion: string) =
     | _ -> false
 
 /// Representative NuGet packages to probe per channel.
-/// If any of these don't exist at the advertised version, the channel is skipped.
 let private probePackages =
     [ "Microsoft.NETCore.App.Runtime.linux-x64"       // runtime pack
       "Microsoft.NETCore.App.Host.linux-x64"          // apphost pack
@@ -73,10 +124,31 @@ let private probePackages =
       "runtime.linux-x64.Microsoft.DotNet.ILCompiler" // NativeAOT ILCompiler
     ]
 
-/// Checks whether a specific package+version exists on NuGet using the flat container API.
-let private nugetPackageExists (client: HttpClient) (packageId: string) (version: string) =
+/// NuGet v3 flat container base URL for nuget.org.
+let private nugetOrgFlatContainer =
+    "https://api.nuget.org/v3-flatcontainer"
+
+/// Resolves the flat container URL for a v3 feed by querying its service index.
+let private resolveFlatContainer (client: HttpClient) (feedUrl: string) =
+    try
+        let json = client.GetStringAsync(feedUrl).Result
+        let doc = JsonDocument.Parse(json)
+
+        doc.RootElement
+            .GetProperty("resources")
+            .EnumerateArray()
+        |> Seq.tryFind (fun r ->
+            let t = r.GetProperty("@type").GetString()
+            t = "PackageBaseAddress/3.0.0")
+        |> Option.map (fun r -> r.GetProperty("@id").GetString().TrimEnd('/'))
+        |> Option.defaultValue nugetOrgFlatContainer
+    with _ ->
+        nugetOrgFlatContainer
+
+/// Checks whether a specific package+version exists on a NuGet feed.
+let private packageExistsOnFeed (client: HttpClient) (flatContainerUrl: string) (packageId: string) (version: string) =
     let url =
-        $"https://api.nuget.org/v3-flatcontainer/{packageId.ToLower()}/{version.ToLower()}/{packageId.ToLower()}.{version.ToLower()}.nupkg"
+        $"{flatContainerUrl}/{packageId.ToLower()}/{version.ToLower()}/{packageId.ToLower()}.{version.ToLower()}.nupkg"
 
     try
         let request = new HttpRequestMessage(HttpMethod.Head, url)
@@ -85,19 +157,28 @@ let private nugetPackageExists (client: HttpClient) (packageId: string) (version
     with _ ->
         false
 
-/// Verifies that representative NuGet packages exist for a channel's latest-runtime version.
+/// Verifies that representative NuGet packages exist for a resolved channel.
 /// Fails with an error if any probe package is missing.
-let verifyChannelPackages (client: HttpClient) (channel: ChannelInfo) =
+let verifyChannelPackages (client: HttpClient) (resolved: ResolvedChannel) =
+    let flatContainer = resolveFlatContainer client resolved.feedUrl
+    let version = resolved.channel.latestRuntime
+    let tfm = channelToTfm resolved.channel.channelVersion
+
     let missing =
         probePackages
-        |> List.filter (fun pkg -> not (nugetPackageExists client pkg channel.latestRuntime))
+        |> List.filter (fun pkg -> not (packageExistsOnFeed client flatContainer pkg version))
 
     if not missing.IsEmpty then
-        eprintfn $"ERROR: Channel {channelToTfm channel.channelVersion} ({channel.latestRuntime}) — packages not found on NuGet:"
+        let originLabel =
+            match resolved.origin with
+            | Released -> "NuGet.org"
+            | Daily -> resolved.feedUrl
+
+        eprintfn $"ERROR: Channel {tfm} ({version}) — packages not found on {originLabel}:"
 
         for pkg in missing do
             eprintfn $"  - {pkg}"
 
         failwith (
-            $"NuGet packages for {channelToTfm channel.channelVersion} {channel.latestRuntime} are not published yet. "
-            + "The releases-index.json may be ahead of NuGet. Investigate and retry.")
+            $"Packages for {tfm} {version} are not available on {originLabel}. "
+            + "Check that the version is correct and packages are published.")

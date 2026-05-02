@@ -10,16 +10,16 @@ type TargetingPack = { id: string; version: string }
 let private targetingPackLabel projectSdk tfm =
     $"//dotnet/private/sdk/targeting_packs:{projectSdk}_{tfm}"
 
-let updateTargetingPacks targetingPacksFile (channels: ReleasesIndex.ChannelInfo list) =
+let updateTargetingPacks targetingPacksFile (channels: ReleasesIndex.ResolvedChannel list) =
     let targetingPacks = File.ReadAllText targetingPacksFile
 
     let targetingPacks =
         JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, TargetingPack[]>>>(targetingPacks)
 
-    // Build a map from TFM to latest version from releases-index
+    // Build a map from TFM to latest version from resolved channels
     let channelVersions =
         channels
-        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channelVersion, c.latestRuntime))
+        |> List.map (fun c -> (ReleasesIndex.channelToTfm c.channel.channelVersion, c.channel.latestRuntime))
         |> Map.ofList
 
     let updatedTargetingPacks =
@@ -42,9 +42,9 @@ let updateTargetingPacks targetingPacksFile (channels: ReleasesIndex.ChannelInfo
                 // Old/EOL channel — keep unchanged
                 updatedtfmPacks.Add(tfmPacks.Key, tfmPacks.Value)
 
-        // Auto-add new TFMs from releases-index that aren't in JSON yet
-        for channel in channels do
-            let tfm = ReleasesIndex.channelToTfm channel.channelVersion
+        // Auto-add new TFMs that aren't in JSON yet
+        for resolved in channels do
+            let tfm = ReleasesIndex.channelToTfm resolved.channel.channelVersion
 
             if not (updatedtfmPacks.ContainsKey tfm) then
                 // Template from the highest existing TFM
@@ -58,7 +58,7 @@ let updateTargetingPacks targetingPacksFile (channels: ReleasesIndex.ChannelInfo
                 | Some template ->
                     let packs =
                         updatedtfmPacks.[template]
-                        |> Array.map (fun p -> { p with version = channel.latestRuntime })
+                        |> Array.map (fun p -> { p with version = resolved.channel.latestRuntime })
 
                     updatedtfmPacks.Add(tfm, packs)
                 | None -> ()
@@ -139,7 +139,7 @@ let generateTargetingPackTargets targetingPacksFile output =
 
     File.WriteAllText(output, sb.ToString())
 
-let generateTargetingPacksNugetRepo (targetingPacksFile: string) (outputFolder: string) =
+let generateTargetingPacksNugetRepo (targetingPacksFile: string) (outputFolder: string) (versionFeedMap: Map<string, string>) =
     let targetingPacksJson = File.ReadAllText targetingPacksFile
 
     let targetingPacks =
@@ -150,14 +150,15 @@ let generateTargetingPacksNugetRepo (targetingPacksFile: string) (outputFolder: 
         |> Seq.collect (fun sdk -> sdk.Value |> Seq.collect (fun tfmPacks -> tfmPacks.Value))
         |> Seq.distinctBy (fun p -> $"{p.id}.{p.version}")
         |> Seq.map (fun pack ->
+            let feed = versionFeedMap.TryFind pack.version |> Option.defaultValue ReleasesIndex.nugetOrgFeed
             let packageInfo =
-                NugetHelpers.getPackageInfo pack.id pack.version NugetHelpers.nugetV3Feed
+                NugetHelpers.getPackageInfo pack.id pack.version feed
 
             { name = $"{pack.id.ToLower()}.v{pack.version}"
               id = pack.id
               version = pack.version
               sha512 = packageInfo.sha512sri
-              sources = [ NugetHelpers.nugetV3Feed ]
+              sources = [ feed ]
               netrc = None
               dependencies = Dictionary<string, string seq>()
               targeting_pack_overrides = packageInfo.overrides
